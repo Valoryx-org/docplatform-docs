@@ -129,6 +129,7 @@ For the complete walkthrough, see the [Getting Started](getting-started/index.md
 | [CLI Reference](reference/cli.md) | Complete command reference |
 | [API Reference](reference/api.md) | REST API endpoints and examples |
 | [Troubleshooting](reference/troubleshooting.md) | Common issues and how to resolve them |
+| [Changelog](reference/zz-changelog.md) | Release history and version notes |
 
 ## Performance
 
