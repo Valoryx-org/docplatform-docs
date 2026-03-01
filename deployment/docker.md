@@ -41,7 +41,7 @@ services:
       - BACKUP_RETENTION_DAYS=30
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -154,8 +154,8 @@ DocPlatform exposes health endpoints:
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /health` | Basic liveness check (server is running) |
-| `GET /ready` | Readiness check (database and search are initialized) |
+| `GET /api/health` | Basic liveness check (server is running) |
+| `GET /api/readyz` | Readiness check (database and search are initialized, reconciliation complete) |
 
 Use these for Docker healthchecks, load balancer probes, or orchestrator liveness/readiness probes.
 

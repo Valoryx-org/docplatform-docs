@@ -17,7 +17,7 @@ http://localhost:3000/p/my-docs/quickstart    → docs/quickstart.md
 http://localhost:3000/p/my-docs/api/auth      → docs/api/auth.md
 ```
 
-Pages are rendered from Markdown to HTML on request using goldmark (CommonMark-compliant) with Chroma syntax highlighting for code blocks.
+Pages are rendered from Markdown to HTML on request using goldmark (CommonMark-compliant) with Shiki syntax highlighting (One Dark Pro / GitHub Light themes) for code blocks.
 
 ### Page status lifecycle
 
@@ -90,7 +90,7 @@ navigation:
 
 ### Syntax highlighting
 
-Code blocks are highlighted using **Chroma** (goldmark-highlighting, Dracula theme). Over 200 languages are supported.
+Code blocks are highlighted using **Shiki** (One Dark Pro / GitHub Light themes). Over 200 languages are supported.
 
 Specify the language after the opening triple backticks:
 
@@ -139,7 +139,7 @@ Restart the server for this change to take effect. No rebuild required.
 
 ## Built-in components
 
-Published docs support 7 custom components that render as rich, interactive elements:
+Published docs support 15+ custom components that render as rich, interactive elements. Here are the most commonly used ones (see [Markdown & Components](markdown.md) for the full list):
 
 ### Callout
 
@@ -220,16 +220,17 @@ Run `docplatform serve` and open the browser.
 ### API Block
 
 ```markdown
-:::api{method="GET" path="/api/v1/pages/{id}"}
-Retrieve a single page by ID.
+:::api{method="GET" path="/api/v1/content/{workspace}/{...path}"}
+Retrieve a single page by workspace and path.
 
 **Parameters:**
-- `id` (path, required) — Page ULID
+- `workspace` (path, required) — Workspace slug
+- `path` (path, required) — Page file path
 
 **Response:** `200 OK`
 ```json
 {
-  "id": "01HJKL...",
+  "page_id": "01HJKL...",
   "title": "Getting Started",
   "content": "..."
 }

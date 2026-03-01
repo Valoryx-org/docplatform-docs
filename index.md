@@ -89,7 +89,7 @@ For the complete walkthrough, see the [Getting Started](getting-started/index.md
 - **Bidirectional git sync** — Web → git commit → push; CLI push → polling → web update
 - **Conflict detection** — Hash-based optimistic concurrency with downloadable diff on collision
 - **Full-text search** — Embedded Bleve engine with permission-filtered results and Cmd+K shortcut
-- **RBAC permissions** — 6 roles: SuperAdmin, WorkspaceAdmin, Admin, Editor, Commenter, Viewer
+- **RBAC permissions** — 6 roles: SuperAdmin, WorkspaceAdmin, SpaceAdmin, Editor, Commenter, Viewer
 - **Authentication** — Local (argon2id) + optional Google/GitHub OIDC
 - **Workspace model** — Org → Workspace → Pages hierarchy with team invitations
 - **Audit trail** — Every mutation logged with user, timestamp, and operation type

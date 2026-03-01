@@ -5,12 +5,13 @@ description: Complete reference for DocPlatform's REST API — authentication, c
 
 # REST API Reference
 
-DocPlatform exposes a RESTful JSON API at `/api/v1/`. All endpoints require authentication unless noted otherwise.
+DocPlatform exposes a RESTful JSON API. Business endpoints live under `/api/v1/`, while infrastructure endpoints (auth, health, git webhooks) use the unversioned `/api/` prefix.
 
-## Base URL
+## Base URLs
 
 ```
-http://localhost:3000/api/v1
+/api/v1/*   — business endpoints (content, workspaces, search, admin)
+/api/*      — infrastructure endpoints (auth, health, git webhook, AI)
 ```
 
 ## Authentication
@@ -27,17 +28,29 @@ Obtain tokens via the login or OIDC endpoints.
 
 | Token | Lifetime | Purpose |
 |---|---|---|
-| Access token | 15 minutes | API authentication |
-| Refresh token | 30 days | Obtain new access tokens |
+| Access token | 30 minutes | API authentication |
+| Refresh token | 7 days | Obtain new access tokens (rotated on each use) |
+
+### API keys
+
+For programmatic access (CI/CD, MCP, scripts), use API keys instead of JWT tokens. API keys use the `dp_` prefix and are scoped to specific workspaces and permissions.
+
+```
+Authorization: Bearer dp_abc123...
+```
+
+Create API keys from **Workspace Settings** → **API Keys**.
 
 ---
 
 ## Auth endpoints
 
+Auth endpoints use the unversioned `/api/auth/` prefix.
+
 ### Register
 
 ```
-POST /api/v1/auth/register
+POST /api/auth/register
 ```
 
 Create a new user account. The first user becomes SuperAdmin.
@@ -64,14 +77,14 @@ Create a new user account. The first user becomes SuperAdmin.
   },
   "access_token": "eyJhbG...",
   "refresh_token": "eyJhbG...",
-  "expires_in": 900
+  "expires_in": 1800
 }
 ```
 
 ### Login
 
 ```
-POST /api/v1/auth/login
+POST /api/auth/login
 ```
 
 Authenticate with email and password.
@@ -91,7 +104,7 @@ Authenticate with email and password.
 {
   "access_token": "eyJhbG...",
   "refresh_token": "eyJhbG...",
-  "expires_in": 900
+  "expires_in": 1800
 }
 ```
 
@@ -105,7 +118,7 @@ Authenticate with email and password.
 ### Refresh token
 
 ```
-POST /api/v1/auth/refresh
+POST /api/auth/refresh
 ```
 
 Exchange a refresh token for a new access token. The refresh token is rotated (old one invalidated).
@@ -124,14 +137,14 @@ Exchange a refresh token for a new access token. The refresh token is rotated (o
 {
   "access_token": "eyJhbG...",
   "refresh_token": "eyJhbG...",
-  "expires_in": 900
+  "expires_in": 1800
 }
 ```
 
 ### Password reset request
 
 ```
-POST /api/v1/auth/password-reset
+POST /api/auth/password-reset
 ```
 
 Request a password reset token. With SMTP configured, an email is sent. Without SMTP, the token is logged to stdout.
@@ -149,7 +162,7 @@ Request a password reset token. With SMTP configured, an email is sent. Without 
 ### Password reset confirm
 
 ```
-POST /api/v1/auth/password-reset/confirm
+POST /api/auth/password-reset/confirm
 ```
 
 Set a new password using a reset token.
@@ -169,75 +182,33 @@ Set a new password using a reset token.
 
 ## Content endpoints
 
-All content endpoints are scoped to a workspace.
-
-### List pages
-
-```
-GET /api/v1/workspaces/{workspace_id}/pages
-```
-
-Returns all pages the current user has permission to view.
-
-**Query parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `parent_id` | string | Filter by parent page (for tree navigation) |
-| `tag` | string | Filter by tag |
-| `published` | boolean | Filter by published status |
-| `limit` | int | Max results (default: 100) |
-| `offset` | int | Pagination offset |
-
-**Response:** `200 OK`
-
-```json
-{
-  "pages": [
-    {
-      "id": "01HJK...",
-      "title": "Getting Started",
-      "slug": "getting-started",
-      "description": "Install and configure DocPlatform.",
-      "path": "getting-started.md",
-      "tags": ["guide"],
-      "published": true,
-      "access": "public",
-      "created_at": "2025-01-15T10:00:00Z",
-      "updated_at": "2025-01-16T14:30:00Z",
-      "author_id": "01HJK..."
-    }
-  ],
-  "total": 42,
-  "limit": 100,
-  "offset": 0
-}
-```
+Content is addressed by **workspace slug and file path**, not by ID. All content endpoints use the `/api/v1/content/{workspace}/{...path}` pattern.
 
 ### Get page
 
 ```
-GET /api/v1/workspaces/{workspace_id}/pages/{page_id}
+GET /api/v1/content/{workspace}/{...path}
 ```
+
+Retrieve a page by its workspace slug and file path.
+
+**Example:** `GET /api/v1/content/my-docs/guides/getting-started`
 
 **Response:** `200 OK`
 
 ```json
 {
-  "id": "01HJK...",
+  "page_id": "01HJK...",
+  "path": "guides/getting-started.md",
   "title": "Getting Started",
-  "slug": "getting-started",
   "description": "Install and configure DocPlatform.",
-  "path": "getting-started.md",
   "content": "# Getting Started\n\nThis guide walks you through...",
   "content_hash": "sha256:abc123...",
+  "frontmatter_hash": "sha256:def456...",
   "tags": ["guide"],
-  "published": true,
-  "access": "public",
-  "parent_id": null,
+  "status": "published",
   "created_at": "2025-01-15T10:00:00Z",
-  "updated_at": "2025-01-16T14:30:00Z",
-  "author_id": "01HJK..."
+  "updated_at": "2025-01-16T14:30:00Z"
 }
 ```
 
@@ -246,63 +217,58 @@ GET /api/v1/workspaces/{workspace_id}/pages/{page_id}
 | Code | Description |
 |---|---|
 | `403` | Insufficient permissions |
-| `404` | Page not found |
+| `404` | Page not found or no read access |
 
-### Create page
+### Create/Update page
 
 ```
-POST /api/v1/workspaces/{workspace_id}/pages
+PUT /api/v1/content/{workspace}/{...path}
 ```
+
+Create a new page or update an existing one at the given path.
 
 **Request:**
 
 ```json
 {
-  "title": "New Page",
-  "slug": "new-page",
-  "content": "# New Page\n\nContent here...",
-  "description": "Description for search and SEO.",
-  "tags": ["guide"],
-  "published": false,
-  "parent_id": null
+  "content": "# Getting Started\n\nUpdated content...",
+  "lastKnownHash": "sha256:abc123..."
 }
 ```
 
-**Response:** `201 Created` — returns the full page object.
+The `lastKnownHash` field enables **optimistic concurrency**. Echo the `content_hash` from the server's last response. If the hash doesn't match the current version, the server returns `409 Conflict`. For new pages, omit `lastKnownHash`.
 
-### Update page
-
-```
-PUT /api/v1/workspaces/{workspace_id}/pages/{page_id}
-```
-
-**Request:**
-
-```json
-{
-  "title": "Updated Title",
-  "content": "# Updated Title\n\nUpdated content...",
-  "content_hash": "sha256:abc123..."
-}
-```
-
-The `content_hash` field enables optimistic concurrency. If the hash doesn't match the current version, the server returns `409 Conflict`.
-
-**Response:** `200 OK` — returns the updated page object.
+**Response:** `200 OK` — returns the full page object with updated hashes.
 
 **Errors:**
 
 | Code | Description |
 |---|---|
-| `409` | Content hash mismatch (concurrent edit detected) |
+| `409` | Content hash mismatch — concurrent edit detected. Response includes `current_hash`, `your_hash`, `modified_by`, `modified_at`. |
 
 ### Delete page
 
 ```
-DELETE /api/v1/workspaces/{workspace_id}/pages/{page_id}
+DELETE /api/v1/content/{workspace}/{...path}
 ```
 
 **Response:** `204 No Content`
+
+### Move/Rename page
+
+```
+PUT /api/v1/content/{workspace}/{...path}
+```
+
+Moving a page is a first-class operation. It preserves the stable `page_id`, updates all wikilinks across the workspace, and creates redirect aliases for the old URL.
+
+Include the `move_to` field in the request body:
+
+```json
+{
+  "move_to": "new/path/for/page"
+}
+```
 
 ---
 
@@ -335,13 +301,21 @@ Requires SuperAdmin role.
 }
 ```
 
+### Page tree
+
+```
+GET /api/v1/workspaces/{id}/tree
+```
+
+Returns the sidebar page tree for a workspace, including nested structure and ordering.
+
 ### Workspace members
 
 ```
-GET /api/v1/workspaces/{workspace_id}/members
-POST /api/v1/workspaces/{workspace_id}/invitations
-DELETE /api/v1/workspaces/{workspace_id}/members/{user_id}
-PUT /api/v1/workspaces/{workspace_id}/members/{user_id}/role
+GET /api/v1/workspaces/{id}/members
+POST /api/v1/admin/invitations
+DELETE /api/v1/workspaces/{id}/members/{user_id}
+PUT /api/v1/workspaces/{id}/members/{user_id}/role
 ```
 
 ---
@@ -349,14 +323,17 @@ PUT /api/v1/workspaces/{workspace_id}/members/{user_id}/role
 ## Search
 
 ```
-GET /api/v1/workspaces/{workspace_id}/search?q={query}
+GET /api/v1/search?q={query}
 ```
+
+Full-text search across workspaces the user has access to.
 
 **Query parameters:**
 
 | Parameter | Type | Description |
 |---|---|---|
 | `q` | string | Search query (required) |
+| `workspace` | string | Filter by workspace slug |
 | `tag` | string | Filter by tag |
 | `limit` | int | Max results (default: 20) |
 
@@ -368,12 +345,9 @@ GET /api/v1/workspaces/{workspace_id}/search?q={query}
     {
       "page_id": "01HJK...",
       "title": "Git Integration",
-      "description": "Bidirectional git sync...",
       "path": "guides/git-integration.md",
       "score": 0.95,
-      "highlights": [
-        "...bidirectional <mark>git sync</mark> lets your team..."
-      ]
+      "snippet": "...bidirectional <mark>git sync</mark> lets your team..."
     }
   ],
   "total": 5,
@@ -394,7 +368,7 @@ Results are permission-filtered — users only see pages they have access to.
 POST /api/v1/workspaces/{workspace_id}/sync
 ```
 
-Manually trigger a git pull + reconciliation. Requires Admin role.
+Manually trigger a git pull + reconciliation. Requires workspace_admin role.
 
 **Response:** `200 OK`
 
@@ -409,43 +383,75 @@ Manually trigger a git pull + reconciliation. Requires Admin role.
 }
 ```
 
-### Webhook endpoints
+### Webhook endpoint
 
 ```
-POST /api/v1/webhooks/github
-POST /api/v1/webhooks/gitlab
-POST /api/v1/webhooks/bitbucket
+POST /api/git/webhook
 ```
 
-These endpoints receive push event payloads from git hosting providers. No authentication header required — they validate using the `GIT_WEBHOOK_SECRET` shared secret.
+A single endpoint that receives push event payloads from GitHub, GitLab, or Bitbucket. The payload format is auto-detected. No authentication header required — payloads are validated using the `GIT_WEBHOOK_SECRET` shared secret (HMAC-SHA256).
+
+---
+
+## AI context
+
+```
+GET /api/ai/context?path={path}&depth={depth}
+```
+
+Returns an LLM-optimized content bundle for RAG pipelines. Includes the target page plus its neighbors (outgoing/incoming wikilinks up to `depth` hops) and workspace context.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `path` | string | — | Page path (required) |
+| `depth` | int | 1 | Wikilink traversal depth |
 
 ---
 
 ## Health
 
-These endpoints do not require authentication.
+These endpoints use the unversioned `/api/` prefix and do not require authentication.
 
 ```
-GET /health    → 200 OK { "status": "ok" }
-GET /ready     → 200 OK { "status": "ready", "db": "ok", "search": "ok" }
+GET /api/health    → 200 OK { "status": "ok", "db": "ok", "git": "ok" }
+GET /api/readyz    → 200 OK { "status": "ready" }
 ```
+
+The `/api/readyz` endpoint returns `503 Service Unavailable` while the initial reconciliation is in progress (startup).
 
 ---
 
 ## Error format
 
-All error responses use a consistent format:
+All error responses follow [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807) (Problem Details for HTTP APIs):
 
 ```json
 {
-  "error": {
-    "code": "CONFLICT",
-    "message": "Content hash mismatch. The page was modified by another user.",
-    "details": {
-      "current_hash": "sha256:def456...",
-      "provided_hash": "sha256:abc123..."
-    }
-  }
+  "type": "https://docplatform.io/errors/conflict-detected",
+  "title": "Conflict Detected",
+  "status": 409,
+  "detail": "Content hash mismatch. The page was modified by another user.",
+  "current_hash": "sha256:def456...",
+  "your_hash": "sha256:abc123...",
+  "modified_by": "jane@example.com",
+  "modified_at": "2025-01-16T14:30:00Z"
+}
+```
+
+Validation errors include a `fields` array:
+
+```json
+{
+  "type": "https://docplatform.io/errors/validation-error",
+  "title": "Validation Error",
+  "status": 400,
+  "detail": "One or more fields are invalid.",
+  "fields": [
+    { "field": "content", "error": "required" },
+    { "field": "lastKnownHash", "error": "must be 64 hex characters" }
+  ]
 }
 ```
 
@@ -453,13 +459,15 @@ All error responses use a consistent format:
 
 | HTTP | Code | Description |
 |---|---|---|
-| `400` | `BAD_REQUEST` | Invalid request body or parameters |
+| `400` | `VALIDATION_ERROR` | Invalid request body or parameters |
 | `401` | `UNAUTHORIZED` | Missing or invalid authentication |
 | `403` | `FORBIDDEN` | Insufficient permissions |
-| `404` | `NOT_FOUND` | Resource not found |
-| `409` | `CONFLICT` | Concurrent modification detected |
+| `404` | `NOT_FOUND` | Resource not found (or no read access) |
+| `409` | `CONFLICT_DETECTED` | Concurrent modification detected |
+| `422` | `UNPROCESSABLE` | Valid syntax but semantic error (e.g., circular wikilink) |
 | `429` | `RATE_LIMITED` | Too many requests |
 | `500` | `INTERNAL_ERROR` | Server error (check logs) |
+| `503` | `SERVICE_UNAVAILABLE` | Reconciliation in progress |
 
 ## Pagination
 
@@ -489,7 +497,7 @@ Pass `next_cursor` as the `cursor` parameter in the next request. When `has_more
 ## Asset uploads
 
 ```
-POST /api/v1/workspaces/{workspace_id}/assets
+POST /api/v1/content/{workspace}/assets
 ```
 
 Upload images and files to a workspace. Assets are stored in the workspace's `assets/` directory and committed to git if sync is enabled.
@@ -508,7 +516,7 @@ Upload images and files to a workspace. Assets are stored in the workspace's `as
 ```json
 {
   "path": "assets/screenshot-2025-01-15.png",
-  "url": "/api/v1/workspaces/{workspace_id}/assets/screenshot-2025-01-15.png",
+  "url": "/api/v1/content/{workspace}/assets/screenshot-2025-01-15.png",
   "size": 245760,
   "content_type": "image/png"
 }
@@ -576,7 +584,7 @@ Removes conflict artifacts after manual resolution.
 ### Obtain a connection ticket
 
 ```
-POST /api/v1/auth/ws-ticket
+POST /api/auth/ws-ticket
 ```
 
 WebSocket connections use a one-time ticket pattern to avoid exposing JWT tokens in URLs.
@@ -640,13 +648,22 @@ Published docs additionally set:
 
 ## Rate limiting
 
-| Endpoint category | Community Edition |
-|---|---|
-| Read operations | 100 / minute per user |
-| Write operations | 20 / minute per user |
-| Search | 30 / minute per user |
-| Auth (login, register, reset) | 5 / minute per IP |
-| Git webhooks | 10 / minute per workspace |
-| Published docs (public) | 1,000 / minute per IP |
+Rate limits are tier-based and scale with your plan. Token bucket algorithm, per-org for authenticated requests, per-IP for unauthenticated.
 
-Rate limit responses include `Retry-After` (seconds) and `X-RateLimit-Reset` (Unix timestamp) headers.
+| Endpoint category | Community / Free | Team | Business | Enterprise |
+|---|---|---|---|---|
+| Content read | 100/min | 300/min | 600/min | 1,200/min |
+| Content write | 20/min | 60/min | 120/min | 300/min |
+| Search | 30/min | 100/min | 200/min | 500/min |
+| Auth (login, register, reset) | 5/min per IP | 5/min | 5/min | 5/min |
+| Git webhooks | 10/min | 30/min | 60/min | 120/min |
+| Published docs (public) | 1,000/min per IP | 3,000/min | 6,000/min | Unlimited |
+
+Rate limit responses include these headers:
+
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1234567890
+Retry-After: 30
+```

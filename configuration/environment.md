@@ -22,8 +22,8 @@ DocPlatform reads configuration from environment variables. Set them in your she
 | Variable | Default | Description |
 |---|---|---|
 | `JWT_SECRET_PATH` | `{DATA_DIR}/jwt-key.pem` | Path to the RS256 private key for JWT signing. Auto-generated on first run if missing. |
-| `JWT_ACCESS_TTL` | `900` | Access token lifetime in seconds (default: 15 minutes) |
-| `JWT_REFRESH_TTL` | `2592000` | Refresh token lifetime in seconds (default: 30 days) |
+| `JWT_ACCESS_TTL` | `1800` | Access token lifetime in seconds (default: 30 minutes) |
+| `JWT_REFRESH_TTL` | `604800` | Refresh token lifetime in seconds (default: 7 days) |
 
 ## OIDC providers (optional)
 

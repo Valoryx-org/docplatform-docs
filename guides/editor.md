@@ -44,7 +44,7 @@ The collapsible frontmatter section at the top of the editor provides form field
 | **Description** | Summary shown in search results and SEO meta tags | No |
 | **Tags** | Categorization labels for filtering and discovery | No |
 | **Published** | Toggle to include/exclude from the public site | No |
-| **Access** | Visibility level: `public`, `workspace`, `restricted` | No |
+| **Access** | Per-operation access rules (read/write/admin by role) | No |
 
 Changes to frontmatter fields update the YAML block in the `.md` file automatically.
 

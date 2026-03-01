@@ -15,7 +15,7 @@ Local auth works without any configuration. Users register with an email and pas
 
 1. **Registration** — User submits email + password. Password is hashed with argon2id (OWASP 2024 recommended algorithm).
 2. **Login** — User submits credentials. Server verifies the password hash and returns JWT tokens.
-3. **Session** — Access token (RS256, 15-minute lifetime) is sent with each API request. Refresh token (30-day lifetime) is used to obtain new access tokens without re-authentication.
+3. **Session** — Access token (RS256, 30-minute lifetime) is sent with each API request. Refresh token (7-day lifetime, rotated on each use) is used to obtain new access tokens without re-authentication.
 
 ### Password hashing
 
@@ -57,21 +57,21 @@ User logs in
     │
     ▼
 ┌─────────────────────────────────┐
-│ Access Token (15 min)            │  ──►  Sent with every API request
-│ Refresh Token (30 days)          │  ──►  Used to get new access tokens
+│ Access Token (30 min)            │  ──►  Sent with every API request
+│ Refresh Token (7 days)           │  ──►  Used to get new access tokens
 └─────────────────────────────────┘
     │
     │  Access token expires
     ▼
 ┌─────────────────────────────────┐
-│ POST /api/v1/auth/refresh        │
+│ POST /api/auth/refresh            │
 │ Body: { refresh_token: "..." }   │
 └─────────────────────────────────┘
     │
     ▼
 ┌─────────────────────────────────┐
-│ New Access Token (15 min)        │  ──►  Old refresh token rotated
-│ New Refresh Token (30 days)      │  ──►  Old one invalidated
+│ New Access Token (30 min)        │  ──►  Old refresh token rotated
+│ New Refresh Token (7 days)       │  ──►  Old one invalidated
 └─────────────────────────────────┘
 ```
 
@@ -84,8 +84,8 @@ Each time a refresh token is used, a new refresh token is issued and the old one
 | Variable | Default | Description |
 |---|---|---|
 | `JWT_SECRET_PATH` | `{DATA_DIR}/jwt-key.pem` | Path to the RS256 private key |
-| `JWT_ACCESS_TTL` | `900` | Access token lifetime (seconds) |
-| `JWT_REFRESH_TTL` | `2592000` | Refresh token lifetime (seconds) |
+| `JWT_ACCESS_TTL` | `1800` | Access token lifetime in seconds (default: 30 minutes) |
+| `JWT_REFRESH_TTL` | `604800` | Refresh token lifetime in seconds (default: 7 days) |
 
 ### Key management
 
@@ -108,7 +108,7 @@ Allow users to sign in with their Google account.
 3. Navigate to **APIs & Services** → **Credentials**
 4. Click **Create Credentials** → **OAuth 2.0 Client ID**
 5. Application type: **Web application**
-6. Add authorized redirect URI: `https://your-domain.com/api/v1/auth/callback/google`
+6. Add authorized redirect URI: `https://your-domain.com/api/auth/callback/google`
 7. Copy the Client ID and Client Secret
 
 Set the environment variables:
@@ -136,7 +136,7 @@ Allow users to sign in with their GitHub account.
 
 1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
 2. Click **New OAuth App**
-3. Set the authorization callback URL: `https://your-domain.com/api/v1/auth/callback/github`
+3. Set the authorization callback URL: `https://your-domain.com/api/auth/callback/github`
 4. Copy the Client ID and generate a Client Secret
 
 Set the environment variables:
@@ -187,7 +187,7 @@ WebSocket connections use a one-time ticket pattern to avoid exposing JWT tokens
 
 **Flow:**
 
-1. Client calls `POST /api/v1/auth/ws-ticket` with a valid JWT
+1. Client calls `POST /api/auth/ws-ticket` with a valid JWT
 2. Server returns a random ticket (valid for **30 seconds**, single-use)
 3. Client connects to `ws://host/ws?ticket={ticket}`
 4. Server validates the ticket, establishes the WebSocket, and discards the ticket
@@ -198,7 +198,7 @@ This is transparent to users — the web editor handles ticket acquisition autom
 
 - **Enable OIDC** for teams with Google or GitHub accounts — delegates password management to established providers
 - **Use HTTPS** in production — JWT tokens are bearer tokens; intercepted tokens grant full access
-- **Keep token lifetimes short** — 15-minute access tokens limit exposure
+- **Keep token lifetimes short** — 30-minute access tokens limit exposure
 - **Monitor sessions** — review active sessions periodically for unexpected devices or IPs
 - **Rotate keys** annually or after any suspected compromise
 - **Use HttpOnly cookies** — DocPlatform stores tokens in HttpOnly + Secure + SameSite=Strict cookies, preventing XSS token theft
