@@ -1,0 +1,326 @@
+name: Sync docs to website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**.md"
+      - "!reference/zz-changelog.md"
+  workflow_dispatch:
+
+concurrency:
+  group: docs-sync
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout docs source
+        uses: actions/checkout@v4
+        with:
+          path: docs-source
+
+      - name: Checkout website repo
+        uses: actions/checkout@v4
+        with:
+          repository: Valoryx-org/valoryx.org
+          token: ${{ secrets.WEBSITE_REPO_TOKEN }}
+          path: website
+
+      - name: Install yq
+        uses: mikefarah/yq@v4
+
+      - name: Sync English docs
+        id: sync
+        env:
+          WORK_DIR: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          SOURCE="$WORK_DIR/docs-source"
+          WEBSITE="$WORK_DIR/website"
+          TARGET="$WEBSITE/content/en/docs"
+          CONFIG="$WEBSITE/docs-sync.yaml"
+
+          # ── Parse config ──────────────────────────────────────────────
+          DEFAULT_WEIGHT=$(yq '.default_weight // 999' "$CONFIG")
+          LANGUAGES=$(yq '.languages[]' "$CONFIG" | tr '\n' ' ')
+
+          # Build exclusion set (newline-separated for grep matching)
+          EXCLUDE_LIST=$(yq '.exclude[]' "$CONFIG" 2>/dev/null || true)
+
+          # ── Helper: inject/replace weight in frontmatter ──────────────
+          inject_weight() {
+            local src="$1" weight="$2" dest="$3"
+            mkdir -p "$(dirname "$dest")"
+            awk -v w="$weight" '
+              BEGIN { in_fm=0; fm_count=0; weight_done=0 }
+              /^---[[:space:]]*$/ {
+                fm_count++
+                if (fm_count == 1) { in_fm=1; print; next }
+                if (fm_count == 2) {
+                  if (!weight_done) print "weight: " w
+                  in_fm=0; print; next
+                }
+              }
+              in_fm && /^weight:/ { print "weight: " w; weight_done=1; next }
+              { print }
+            ' "$src" > "$dest"
+          }
+
+          # Track results
+          CHANGED_FILES=""
+          NEW_FILES=""
+          DELETED_FILES=""
+          WARNINGS=""
+          TRANSLATION_IMPACT=""
+          SYNCED_TARGETS=""
+
+          # Clean path lists for language propagation (no markdown formatting)
+          NEW_PATHS=""
+          DELETED_PATHS=""
+
+          # ── Step 1: Sync each source file to content/en/docs/ ─────────
+          while IFS= read -r src_file; do
+            rel="${src_file#$SOURCE/}"
+
+            # Skip excluded files
+            if echo "$EXCLUDE_LIST" | grep -qxF "$rel"; then
+              continue
+            fi
+
+            # Compute Hugo target path (index.md → _index.md)
+            target_rel="$rel"
+            if [[ "$target_rel" == "index.md" ]]; then
+              target_rel="_index.md"
+            else
+              target_rel="${target_rel/\/index.md/\/_index.md}"
+            fi
+
+            target_path="$TARGET/$target_rel"
+
+            # Look up weight from config
+            weight=$(yq --arg key "$rel" '.weights[$key] // ""' "$CONFIG")
+            if [[ -z "$weight" || "$weight" == "null" ]]; then
+              weight="$DEFAULT_WEIGHT"
+              WARNINGS="${WARNINGS}- \`$rel\` has no weight mapping (using default $DEFAULT_WEIGHT)\n"
+            fi
+
+            # Detect new vs existing
+            is_new=false
+            if [[ ! -f "$target_path" ]]; then
+              is_new=true
+              NEW_FILES="${NEW_FILES}- \`$target_rel\`\n"
+              NEW_PATHS="${NEW_PATHS}${target_rel}\n"
+            fi
+
+            # Inject weight and write to English docs dir
+            inject_weight "$src_file" "$weight" "$target_path"
+
+            # Track for orphan detection
+            SYNCED_TARGETS="${SYNCED_TARGETS}${target_rel}\n"
+
+            # For existing files: check if content actually changed
+            if [[ "$is_new" == "false" ]]; then
+              if ! git -C "$WEBSITE" diff --quiet "content/en/docs/$target_rel" 2>/dev/null; then
+                CHANGED_FILES="${CHANGED_FILES}- \`$target_rel\`\n"
+
+                # Flag translation impact
+                for lang in $LANGUAGES; do
+                  [[ "$lang" == "en" ]] && continue
+                  if [[ -f "$WEBSITE/content/$lang/docs/$target_rel" ]]; then
+                    TRANSLATION_IMPACT="${TRANSLATION_IMPACT}- **$lang**: \`$target_rel\` may need re-translation\n"
+                  fi
+                done
+              fi
+            fi
+          done < <(find "$SOURCE" -name "*.md" -not -path "*/.git/*" -type f | sort)
+
+          # ── Step 2: Ensure hugo_only section stubs exist ──────────────
+          hugo_only_count=$(yq '.hugo_only | length' "$CONFIG" 2>/dev/null || echo "0")
+          for ((i=0; i<hugo_only_count; i++)); do
+            ho_path=$(yq ".hugo_only[$i].path" "$CONFIG")
+            ho_title=$(yq ".hugo_only[$i].title" "$CONFIG")
+            ho_desc=$(yq ".hugo_only[$i].description" "$CONFIG")
+            ho_weight=$(yq ".hugo_only[$i].weight" "$CONFIG")
+            target="$TARGET/$ho_path"
+
+            SYNCED_TARGETS="${SYNCED_TARGETS}${ho_path}\n"
+
+            # Only generate if missing — never overwrite existing stubs
+            if [[ ! -f "$target" ]]; then
+              mkdir -p "$(dirname "$target")"
+              printf '%s\ntitle: "%s"\ndescription: "%s"\nweight: %s\n%s\n' \
+                '---' "$ho_title" "$ho_desc" "$ho_weight" '---' > "$target"
+              NEW_FILES="${NEW_FILES}- \`$ho_path\` (hugo_only stub)\n"
+              NEW_PATHS="${NEW_PATHS}${ho_path}\n"
+            fi
+          done
+
+          # ── Step 3: Detect and remove orphaned English files ──────────
+          while IFS= read -r existing; do
+            existing_rel="${existing#$TARGET/}"
+            if ! echo -e "$SYNCED_TARGETS" | grep -qxF "$existing_rel"; then
+              DELETED_FILES="${DELETED_FILES}- \`$existing_rel\`\n"
+              DELETED_PATHS="${DELETED_PATHS}${existing_rel}\n"
+              rm "$existing"
+            fi
+          done < <(find "$TARGET" -name "*.md" -type f | sort)
+
+          # ── Step 4: Propagate to other languages ──────────────────────
+          for lang in $LANGUAGES; do
+            [[ "$lang" == "en" ]] && continue
+            lang_dir="$WEBSITE/content/$lang/docs"
+
+            # New English files → copy as fallback (only if lang version doesn't exist)
+            if [[ -n "$NEW_PATHS" ]]; then
+              while IFS= read -r new_rel; do
+                [[ -z "$new_rel" ]] && continue
+                if [[ -f "$TARGET/$new_rel" && ! -f "$lang_dir/$new_rel" ]]; then
+                  mkdir -p "$(dirname "$lang_dir/$new_rel")"
+                  cp "$TARGET/$new_rel" "$lang_dir/$new_rel"
+                fi
+              done <<< "$(echo -e "$NEW_PATHS")"
+            fi
+
+            # Deleted English files → remove from this language too
+            if [[ -n "$DELETED_PATHS" ]]; then
+              while IFS= read -r del_rel; do
+                [[ -z "$del_rel" ]] && continue
+                if [[ -f "$lang_dir/$del_rel" ]]; then
+                  rm "$lang_dir/$del_rel"
+                fi
+              done <<< "$(echo -e "$DELETED_PATHS")"
+            fi
+
+            # Clean up empty directories
+            find "$lang_dir" -type d -empty -delete 2>/dev/null || true
+          done
+
+          # Clean up empty dirs in English too
+          find "$TARGET" -type d -empty -delete 2>/dev/null || true
+
+          # ── Step 5: Check for actual changes ──────────────────────────
+          cd "$WEBSITE"
+          UNTRACKED=$(git ls-files --others --exclude-standard content/)
+          if git diff --quiet content/ && [[ -z "$UNTRACKED" ]]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No changes to sync."
+            exit 0
+          fi
+
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+          # Store PR body components
+          {
+            echo "DIFF_STAT<<EOFSTAT"
+            git diff --stat content/
+            echo "$UNTRACKED" | sed '/^$/d' | sed 's/^/new file: /'
+            echo "EOFSTAT"
+
+            echo "CHANGED<<EOFCHANGED"
+            echo -e "$CHANGED_FILES"
+            echo "EOFCHANGED"
+
+            echo "NEW<<EOFNEW"
+            echo -e "$NEW_FILES"
+            echo "EOFNEW"
+
+            echo "DELETED<<EOFDELETED"
+            echo -e "$DELETED_FILES"
+            echo "EOFDELETED"
+
+            echo "WARNINGS<<EOFWARN"
+            echo -e "$WARNINGS"
+            echo "EOFWARN"
+
+            echo "TRANSLATIONS<<EOFTRANS"
+            echo -e "$TRANSLATION_IMPACT"
+            echo "EOFTRANS"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or update sync PR
+        if: steps.sync.outputs.has_changes == 'true'
+        working-directory: website
+        env:
+          GH_TOKEN: ${{ secrets.WEBSITE_REPO_TOKEN }}
+          SYNC_DIFF_STAT: ${{ steps.sync.outputs.DIFF_STAT }}
+          SYNC_CHANGED: ${{ steps.sync.outputs.CHANGED }}
+          SYNC_NEW: ${{ steps.sync.outputs.NEW }}
+          SYNC_DELETED: ${{ steps.sync.outputs.DELETED }}
+          SYNC_WARNINGS: ${{ steps.sync.outputs.WARNINGS }}
+          SYNC_TRANSLATIONS: ${{ steps.sync.outputs.TRANSLATIONS }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          BRANCH="docs-sync/pending"
+          SOURCE_SHA="${COMMIT_SHA::7}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create branch, stage ONLY docs content, commit
+          git checkout -B "$BRANCH"
+          git add content/en/docs/ content/fr/docs/ content/de/docs/ content/es/docs/ content/ru/docs/ content/uk/docs/
+          git diff --cached --quiet && { echo "No staged changes"; exit 0; }
+          git commit -m "docs: sync from docplatform-docs@${SOURCE_SHA}"
+          git push --force origin "$BRANCH"
+
+          # Build PR body (all values from env vars, never inline ${{ }})
+          PR_BODY="## Docs sync from docplatform-docs
+
+          Source commit: [\`${SOURCE_SHA}\`](https://github.com/Valoryx-org/docplatform-docs/commit/${COMMIT_SHA})
+
+          ### Changes
+          \`\`\`
+          ${SYNC_DIFF_STAT}
+          \`\`\`"
+
+          [[ -n "$SYNC_CHANGED" ]] && PR_BODY="${PR_BODY}
+
+          ### Modified
+          ${SYNC_CHANGED}"
+
+          [[ -n "$SYNC_NEW" ]] && PR_BODY="${PR_BODY}
+
+          ### New pages
+          ${SYNC_NEW}"
+
+          [[ -n "$SYNC_DELETED" ]] && PR_BODY="${PR_BODY}
+
+          ### Deleted pages
+          ${SYNC_DELETED}"
+
+          [[ -n "$SYNC_TRANSLATIONS" ]] && PR_BODY="${PR_BODY}
+
+          ### Translation impact
+          The following translated pages may need updating:
+          ${SYNC_TRANSLATIONS}"
+
+          [[ -n "$SYNC_WARNINGS" ]] && PR_BODY="${PR_BODY}
+
+          ### Warnings
+          ${SYNC_WARNINGS}"
+
+          PR_BODY="${PR_BODY}
+
+          ---
+          Auto-generated by [docs-sync workflow](https://github.com/Valoryx-org/docplatform-docs/actions)."
+
+          # Reuse existing PR or create new one
+          EXISTING_PR=$(gh pr list --repo Valoryx-org/valoryx.org --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [[ -n "$EXISTING_PR" && "$EXISTING_PR" != "null" ]]; then
+            gh pr edit "$EXISTING_PR" --repo Valoryx-org/valoryx.org --body "$PR_BODY"
+            echo "Updated existing PR #$EXISTING_PR"
+          else
+            gh pr create \
+              --repo Valoryx-org/valoryx.org \
+              --title "docs: sync from docplatform-docs@${SOURCE_SHA}" \
+              --body "$PR_BODY" \
+              --head "$BRANCH" \
+              --base main
+          fi
