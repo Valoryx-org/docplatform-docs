@@ -1,0 +1,21 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+
+# Build artifacts
+node_modules/
