@@ -104,7 +104,7 @@ jobs:
             target_path="$TARGET/$target_rel"
 
             # Look up weight from config
-            weight=$(yq --arg key "$rel" '.weights[$key] // ""' "$CONFIG")
+            weight=$(KEY="$rel" yq '.weights[env(KEY)] // ""' "$CONFIG")
             if [[ -z "$weight" || "$weight" == "null" ]]; then
               weight="$DEFAULT_WEIGHT"
               WARNINGS="${WARNINGS}- \`$rel\` has no weight mapping (using default $DEFAULT_WEIGHT)\n"
