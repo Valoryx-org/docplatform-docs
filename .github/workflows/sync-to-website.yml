@@ -269,7 +269,7 @@ jobs:
           git commit -m "docs: sync from docplatform-docs@${SOURCE_SHA}"
           git push --force origin "$BRANCH"
 
-          # Build PR body (all values from env vars, never inline ${{ }})
+          # Build PR body from env vars
           PR_BODY="## Docs sync from docplatform-docs
 
           Source commit: [\`${SOURCE_SHA}\`](https://github.com/Valoryx-org/docplatform-docs/commit/${COMMIT_SHA})
