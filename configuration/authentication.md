@@ -1,11 +1,11 @@
 ---
 title: Authentication
-description: Configure local authentication, Google and GitHub OIDC sign-in, JWT settings, and password policies.
+description: Configure local authentication, Google and GitHub OIDC sign-in, WebAuthn/Passkeys, JWT settings, and password policies.
 ---
 
 # Authentication
 
-DocPlatform supports local authentication (email + password) out of the box, with optional Google and GitHub OIDC sign-in for teams that use those providers.
+DocPlatform supports local authentication (email + password) out of the box, with optional Google/GitHub OIDC sign-in and WebAuthn/Passkeys for passwordless login.
 
 ## Local authentication (default)
 
@@ -30,7 +30,7 @@ DocPlatform uses argon2id with the following parameters (OWASP 2024 standard):
 | **Salt length** | 16 bytes |
 | **Key length** | 32 bytes |
 
-These parameters are not configurable — they follow security best practices. Password hashes are stored in the SQLite database and never leave the server.
+The memory, iterations, and parallelism parameters are configurable via `ARGON2_MEMORY`, `ARGON2_TIME`, and `ARGON2_THREADS` environment variables. See [Environment Variables](environment.md). Password hashes are stored in the SQLite database and never leave the server.
 
 ### Password reset
 
@@ -83,7 +83,7 @@ Each time a refresh token is used, a new refresh token is issued and the old one
 
 | Variable | Default | Description |
 |---|---|---|
-| `JWT_SECRET_PATH` | `{DATA_DIR}/jwt-key.pem` | Path to the RS256 private key |
+| `JWT_KEY_PATH` | `{DATA_DIR}/jwt-key.pem` | Path to the RS256 private key |
 | `JWT_ACCESS_TTL` | `1800` | Access token lifetime in seconds (default: 30 minutes) |
 | `JWT_REFRESH_TTL` | `604800` | Refresh token lifetime in seconds (default: 7 days) |
 
@@ -151,6 +151,68 @@ Restart the server. A **Sign in with GitHub** button appears on the login page.
 ### User provisioning
 
 Same as Google — a DocPlatform account is created using the GitHub primary email. If the GitHub account has no public email, the user is prompted to enter one.
+
+## WebAuthn / Passkeys (optional)
+
+Allow users to sign in with hardware security keys, biometrics, or platform authenticators (Touch ID, Face ID, Windows Hello). This provides passwordless, phishing-resistant authentication.
+
+### Setup
+
+Set the following environment variables:
+
+```bash
+export WEBAUTHN_RP_ID=docs.example.com
+export WEBAUTHN_RP_DISPLAY_NAME="My Docs"
+export WEBAUTHN_RP_ORIGINS=https://docs.example.com
+```
+
+Restart the server. A **Sign in with Passkey** button appears on the login page.
+
+### How it works
+
+1. **Registration** — User goes to Profile → Security → **Register Passkey**
+2. Browser prompts for biometric or security key verification
+3. A credential is stored on the server (public key only — the private key never leaves the device)
+4. **Login** — User clicks "Sign in with Passkey" and authenticates with their device
+
+### Managing credentials
+
+Users can manage their passkeys from their profile:
+
+- **List credentials** — `GET /api/auth/webauthn/credentials`
+- **Delete a credential** — `DELETE /api/auth/webauthn/credentials/:id`
+
+Each credential stores a name, last-used timestamp, and sign count for clone detection.
+
+### Requirements
+
+| Requirement | Details |
+|---|---|
+| **HTTPS** | Required — WebAuthn only works over secure connections |
+| **Browser support** | Chrome 67+, Firefox 60+, Safari 14+, Edge 79+ |
+| **RP ID** | Must match the domain users access (no wildcards) |
+
+## API keys
+
+For programmatic access (CI/CD pipelines, MCP integrations, scripts), use API keys instead of JWT tokens.
+
+### How it works
+
+1. Create an API key from the web UI or API: `POST /api/v1/api-keys`
+2. The key is returned once in full (prefixed with `dp_live_`) — store it securely
+3. Use the key as a Bearer token: `Authorization: Bearer dp_live_...`
+4. Only the key hash is stored server-side (HMAC with configurable pepper)
+
+### Key management
+
+| Operation | Endpoint |
+|---|---|
+| Create key | `POST /api/v1/api-keys` |
+| List keys (prefix only) | `GET /api/v1/api-keys` |
+| Delete key | `DELETE /api/v1/api-keys/:id` |
+| Rotate key | `POST /api/v1/api-keys/:id/rotate` |
+
+Keys are scoped to the organization. Set `API_KEY_PEPPER` (or `DOCPLATFORM_API_KEY_PEPPER`) for HMAC hashing security.
 
 ## Session management
 

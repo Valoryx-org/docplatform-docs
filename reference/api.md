@@ -144,7 +144,7 @@ Exchange a refresh token for a new access token. The refresh token is rotated (o
 ### Password reset request
 
 ```
-POST /api/auth/password-reset
+POST /api/auth/forgot-password
 ```
 
 Request a password reset token. With SMTP configured, an email is sent. Without SMTP, the token is logged to stdout.
@@ -162,7 +162,7 @@ Request a password reset token. With SMTP configured, an email is sent. Without 
 ### Password reset confirm
 
 ```
-POST /api/auth/password-reset/confirm
+POST /api/auth/reset-password
 ```
 
 Set a new password using a reset token.
@@ -177,6 +177,36 @@ Set a new password using a reset token.
 ```
 
 **Response:** `200 OK`
+
+### OIDC providers
+
+```
+GET  /api/auth/providers          — List available OIDC providers
+POST /api/auth/oidc/:provider     — Start OIDC flow (google or github)
+GET  /api/auth/oidc/:provider/callback  — OIDC callback
+POST /api/auth/oidc/claim         — Claim OIDC tokens after callback
+```
+
+### WebAuthn / Passkeys
+
+```
+POST   /api/auth/webauthn/register/begin   — Start passkey registration
+POST   /api/auth/webauthn/register/finish  — Complete passkey registration
+POST   /api/auth/webauthn/login/begin      — Start passkey login
+POST   /api/auth/webauthn/login/finish     — Complete passkey login
+GET    /api/auth/webauthn/credentials      — List stored credentials
+DELETE /api/auth/webauthn/credentials/:id  — Delete a credential
+```
+
+### Other auth endpoints
+
+```
+POST /api/auth/logout                   — Logout (revoke refresh token)
+GET  /api/auth/me                       — Current user info
+GET  /api/auth/sessions                 — List active sessions
+POST /api/auth/ws-token                 — Get WebSocket ticket
+POST /api/auth/invitations/accept       — Accept workspace invitation
+```
 
 ---
 
@@ -301,22 +331,50 @@ Requires SuperAdmin role.
 }
 ```
 
+### Get workspace
+
+```
+GET /api/v1/workspaces/:id
+```
+
+### Delete workspace
+
+```
+DELETE /api/v1/workspaces/:id
+```
+
+Soft-deletes the workspace.
+
 ### Page tree
 
 ```
-GET /api/v1/workspaces/{id}/tree
+GET /api/v1/content/:workspace/tree
 ```
 
-Returns the sidebar page tree for a workspace, including nested structure and ordering.
+Returns the hierarchical page tree for a workspace, including nested structure and ordering.
 
-### Workspace members
+### Reorder pages
 
 ```
-GET /api/v1/workspaces/{id}/members
-POST /api/v1/admin/invitations
-DELETE /api/v1/workspaces/{id}/members/{user_id}
-PUT /api/v1/workspaces/{id}/members/{user_id}/role
+POST /api/v1/content/:workspace/reorder
 ```
+
+Reorder pages within a tree level. Requires write permission.
+
+**Request:**
+
+```json
+{
+  "parent_path": "guides",
+  "order": [
+    { "id": "01HJK...", "sort_order": 0 },
+    { "id": "01HJL...", "sort_order": 1 },
+    { "id": "01HJM...", "sort_order": 2 }
+  ]
+}
+```
+
+**Response:** `204 No Content`
 
 ---
 
@@ -393,20 +451,268 @@ A single endpoint that receives push event payloads from GitHub, GitLab, or Bitb
 
 ---
 
-## AI context
+## AI features
+
+### AI status
 
 ```
-GET /api/ai/context?path={path}&depth={depth}
+GET /api/v1/ai/status
 ```
 
-Returns an LLM-optimized content bundle for RAG pipelines. Includes the target page plus its neighbors (outgoing/incoming wikilinks up to `depth` hops) and workspace context.
+Check whether AI features are enabled and which provider is configured.
 
-**Query parameters:**
+### Writing assist
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `path` | string | — | Page path (required) |
-| `depth` | int | 1 | Wikilink traversal depth |
+```
+POST /api/v1/ai/writing-assist
+```
+
+Rewrite, improve, shorten, or expand selected content.
+
+**Request:**
+
+```json
+{
+  "workspace_id": "01HJK...",
+  "operation": "improve",
+  "content": "This is the text to improve."
+}
+```
+
+**Operations:** `rewrite`, `improve`, `shorten`, `expand`
+
+**Response:** `200 OK`
+
+```json
+{
+  "result": "Here is the improved text..."
+}
+```
+
+### Doc chat
+
+```
+POST /api/v1/ai/chat
+```
+
+Multi-turn conversation about workspace documentation.
+
+**Request:**
+
+```json
+{
+  "workspace_id": "01HJK...",
+  "messages": [
+    { "role": "user", "content": "How do I configure git sync?" }
+  ]
+}
+```
+
+---
+
+## Invitations
+
+```
+GET    /api/v1/workspaces/:id/invitations              — List pending invitations (admin)
+POST   /api/v1/workspaces/:id/invitations              — Create invitation (admin)
+DELETE /api/v1/workspaces/:id/invitations/:invitationId — Revoke invitation (admin)
+```
+
+Invitations are email-based with a 7-day TTL. Accepted via `POST /api/auth/invitations/accept`.
+
+---
+
+## API keys
+
+```
+POST   /api/v1/api-keys           — Create API key (returns full key once)
+GET    /api/v1/api-keys           — List API keys (prefix only)
+DELETE /api/v1/api-keys/:id       — Delete API key
+POST   /api/v1/api-keys/:id/rotate — Rotate API key
+```
+
+API keys use the `dp_live_` prefix and are scoped to the organization.
+
+---
+
+## Billing
+
+Requires Stripe configuration. Disabled when `STRIPE_SECRET_KEY` is not set.
+
+```
+POST /api/v1/billing/checkout       — Create Stripe Checkout session
+POST /api/v1/billing/portal         — Create Stripe Customer Portal session
+GET  /api/v1/billing/subscription   — Current subscription status
+GET  /api/v1/billing/plans          — Available plans and pricing
+GET  /api/v1/billing/limits         — Plan limits and current usage
+```
+
+### Stripe webhook
+
+```
+POST /api/webhooks/stripe
+```
+
+Receives Stripe webhook events (signature-verified). Handles subscription lifecycle events with idempotency.
+
+---
+
+## Analytics
+
+GDPR-compliant analytics with cookie consent. Feature-gated to paid plans.
+
+```
+POST /api/analytics/consent                          — Record GDPR consent
+GET  /api/v1/workspaces/:id/analytics/pages          — Top pages (configurable days)
+GET  /api/v1/workspaces/:id/analytics/searches       — Top search queries
+GET  /api/v1/workspaces/:id/analytics/overview       — Dashboard overview
+```
+
+---
+
+## Doc versioning
+
+Named documentation versions (e.g., v1, v2) within a workspace.
+
+```
+GET    /api/v1/workspaces/:id/versions              — List versions
+POST   /api/v1/workspaces/:id/versions              — Create version (admin)
+GET    /api/v1/workspaces/:id/versions/:slug         — Get version details
+PUT    /api/v1/workspaces/:id/versions/:slug/default — Set default version (admin)
+DELETE /api/v1/workspaces/:id/versions/:slug         — Delete version (admin)
+```
+
+---
+
+## Templates
+
+```
+GET /api/v1/templates      — List available templates
+GET /api/v1/templates/:id  — Get template content
+```
+
+---
+
+## Quality scanner
+
+```
+GET /api/v1/workspaces/:id/quality
+```
+
+Scan a workspace for documentation quality issues. Returns readability scores, dead links, and completeness checks.
+
+---
+
+## Static export
+
+```
+GET /api/v1/workspaces/:id/export
+```
+
+Export all published pages as a static HTML ZIP file.
+
+---
+
+## Custom domains
+
+```
+PUT    /api/v1/workspaces/:id/custom-domain  — Set custom domain (admin)
+GET    /api/v1/workspaces/:id/custom-domain  — Get domain status (admin)
+DELETE /api/v1/workspaces/:id/custom-domain  — Remove domain (admin)
+```
+
+---
+
+## Workspace admin
+
+```
+GET /api/v1/workspaces/:id/admin/members              — List members
+PUT /api/v1/workspaces/:id/admin/members/:user_id/role — Update member role
+GET /api/v1/workspaces/:id/admin/settings              — Get workspace settings
+PUT /api/v1/workspaces/:id/admin/settings              — Update workspace settings
+```
+
+---
+
+## Onboarding
+
+```
+GET   /api/v1/users/me/onboarding  — Get onboarding state
+PATCH /api/v1/users/me/onboarding  — Update onboarding state
+```
+
+---
+
+## Super admin panel
+
+These endpoints require the `super_admin` role. All prefixed with `/api/admin/`.
+
+### Organization management
+
+```
+GET  /api/admin/orgs                          — List all organizations
+GET  /api/admin/orgs/:id                      — Get organization details
+PUT  /api/admin/orgs/:id/plan                 — Change organization plan
+POST /api/admin/orgs/:id/subscription/override — Override subscription
+PUT  /api/admin/orgs/:id/rate-limits          — Override rate limits
+POST /api/admin/orgs/:id/export               — Export org data (GDPR)
+```
+
+### User management
+
+```
+GET    /api/admin/users              — List all users
+GET    /api/admin/users/:id          — Get user details
+POST   /api/admin/users/:id/impersonate — Impersonate user
+POST   /api/admin/users/:id/export   — Export user data (GDPR)
+DELETE /api/admin/users/:id          — Delete user (GDPR right to erasure)
+```
+
+### Audit log
+
+```
+GET /api/admin/audit-log    — Query audit log (filterable by user, action, resource, date range)
+```
+
+### Billing overview
+
+```
+GET /api/admin/billing/overview       — Platform-wide billing summary
+GET /api/admin/billing/subscriptions  — All active subscriptions
+GET /api/admin/billing/events         — Webhook event log
+```
+
+### Domain management
+
+```
+GET    /api/admin/domains              — List all custom domains
+POST   /api/admin/domains/:id/verify   — Verify domain DNS
+POST   /api/admin/domains/:id/provision — Provision TLS certificate
+DELETE /api/admin/domains/:id          — Delete domain
+```
+
+### System health
+
+```
+GET /api/admin/system/health    — System health metrics (disk, memory, uptime, DB stats)
+```
+
+### Platform analytics
+
+```
+GET /api/admin/analytics/overview  — Platform-wide analytics overview
+GET /api/admin/analytics/growth    — Platform growth metrics
+```
+
+---
+
+## Prometheus metrics
+
+```
+GET /metrics
+```
+
+Available when `FF_METRICS=true`. Requires super admin authentication. Exposes HTTP latency histograms, request counts, auth event counters, and more.
 
 ---
 
