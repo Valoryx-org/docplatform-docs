@@ -706,6 +706,36 @@ GET /api/admin/analytics/growth    — Platform growth metrics
 
 ---
 
+## MCP server
+
+DocPlatform includes a built-in MCP (Model Context Protocol) server exposing 13 tools for AI agent integration. The MCP server runs on stdio and is started via the CLI:
+
+```bash
+docplatform mcp --workspace my-docs --api-key dp_live_abc123
+```
+
+### MCP tools
+
+| Tool | Category | Description |
+|---|---|---|
+| `get_page` | Read | Fetch page content by path |
+| `list_pages` | Read | List all pages with metadata |
+| `get_page_tree` | Read | Hierarchical page tree |
+| `get_page_metadata` | Read | Frontmatter, tags, timestamps |
+| `get_page_links` | Read | Inbound/outbound wikilinks |
+| `search` | Search | Full-text search with snippets |
+| `search_by_tag` | Search | Find pages by tag |
+| `create_page` | Write | Create a new page |
+| `update_page` | Write | Update with concurrency check |
+| `move_page` | Write | Move/rename with wikilink updates |
+| `delete_page` | Write | Delete a page |
+| `quality_check` | Maintain | Readability, dead links, completeness |
+| `workspace_stats` | Maintain | Page count, word count, health summary |
+
+All tools respect workspace permissions and require a valid API key. See the [AI Features guide](../guides/ai-features.md) for setup instructions.
+
+---
+
 ## Prometheus metrics
 
 ```

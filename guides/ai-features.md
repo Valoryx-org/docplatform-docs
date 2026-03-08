@@ -136,16 +136,59 @@ Add to your `claude_desktop_config.json`:
 claude mcp add docplatform -- docplatform mcp --workspace my-docs --api-key dp_live_abc123
 ```
 
-### What MCP exposes
+### Cursor integration
 
-The MCP server provides tools for AI agents to:
+Add to `.cursor/mcp.json` in your project:
 
-- **Read pages** — fetch any page by path
-- **Search** — full-text search across workspace content
-- **List pages** — browse the page tree
-- **Get metadata** — frontmatter, tags, status, and relationships
+```json
+{
+  "mcpServers": {
+    "docplatform": {
+      "command": "docplatform",
+      "args": ["mcp", "--workspace", "my-docs", "--api-key", "dp_live_abc123"]
+    }
+  }
+}
+```
 
-All access is authenticated via the API key and respects workspace permissions.
+### Available MCP tools (13)
+
+The MCP server exposes 13 tools organized into four categories:
+
+#### Read & navigate
+
+| Tool | Description |
+|---|---|
+| `get_page` | Fetch a single page by path — returns Markdown content, frontmatter, and metadata |
+| `list_pages` | List all pages in the workspace with title, path, and status |
+| `get_page_tree` | Hierarchical page tree showing parent-child relationships |
+| `get_page_metadata` | Frontmatter, tags, status, word count, and timestamps |
+| `get_page_links` | Outbound and inbound wikilinks for a page |
+
+#### Search & discover
+
+| Tool | Description |
+|---|---|
+| `search` | Full-text search with scored results and highlighted snippets |
+| `search_by_tag` | Find pages by tag (exact match or partial) |
+
+#### Write & organize
+
+| Tool | Description |
+|---|---|
+| `create_page` | Create a new page with Markdown content and frontmatter |
+| `update_page` | Update page content with optimistic concurrency (hash check) |
+| `move_page` | Move/rename a page — updates all wikilinks automatically |
+| `delete_page` | Delete a page by path |
+
+#### Maintain
+
+| Tool | Description |
+|---|---|
+| `quality_check` | Run readability scoring, dead link detection, and completeness checks |
+| `workspace_stats` | Page count, word count, tag distribution, and health summary |
+
+All access is authenticated via the API key and scoped to the specified workspace.
 
 ## Feature gating
 
