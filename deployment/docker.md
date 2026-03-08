@@ -72,7 +72,7 @@ docker compose up -d
 | Tag | Description |
 |---|---|
 | `latest` | Most recent stable release |
-| `v0.5.0` | Specific version |
+| `v0.5.2` | Specific version |
 | `v0.5` | Latest patch for v0.5.x |
 
 ## Volumes
