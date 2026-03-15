@@ -1,3 +1,27 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Docs Sync Pipeline: docplatform-docs → valoryx.org
+#
+# WHAT IT DOES:
+#   When any .md file is pushed to main in this repo, this workflow:
+#   1. Copies English docs to content/en/docs/ in valoryx.org
+#   2. Injects Hugo weight values from docs-sync.yaml (sidebar ordering)
+#   3. Generates hugo_only section stubs if missing (_index.md for sections)
+#   4. Detects and removes orphaned pages no longer in source
+#   5. Propagates new pages to all 6 languages (EN fallback for untranslated)
+#   6. Removes deleted pages from all languages
+#   7. Commits and pushes directly to main → Cloudflare Pages auto-deploys
+#
+# WHY DIRECT PUSH (not PR):
+#   Content is already reviewed in docplatform-docs. The sync is a mechanical
+#   copy with weight injection. A PR adds a manual merge bottleneck with zero
+#   review value for a solo founder. Audit trail is preserved in commit messages
+#   which include the source commit SHA and a summary of all changes.
+#
+# CONFIG: docs-sync.yaml in valoryx.org repo (weights, exclusions, hugo_only)
+# SECRET: WEBSITE_REPO_TOKEN (PAT with contents:write on valoryx.org)
+# DEPLOY: Cloudflare Pages auto-deploys on push to main (valoryx.org)
+# ──────────────────────────────────────────────────────────────────────────────
+
 name: Sync docs to website
 
 on:
@@ -5,7 +29,7 @@ on:
     branches: [main]
     paths:
       - "**.md"
-      - "!reference/zz-changelog.md"
+      - "!reference/zz-changelog.md"  # changelog synced by release pipeline
   workflow_dispatch:
 
 concurrency:
@@ -20,19 +44,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout docs source
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: docs-source
 
       - name: Checkout website repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: Valoryx-org/valoryx.org
           token: ${{ secrets.WEBSITE_REPO_TOKEN }}
           path: website
 
       - name: Install yq
-        uses: mikefarah/yq@v4
+        uses: mikefarah/yq@bbdd97482f2d439126582a59689eb1c855944955 # v4.44.6
 
       - name: Sync English docs
         id: sync
@@ -72,15 +96,12 @@ jobs:
             ' "$src" > "$dest"
           }
 
-          # Track results
+          # Track results for commit message
           CHANGED_FILES=""
           NEW_FILES=""
           DELETED_FILES=""
           WARNINGS=""
-          TRANSLATION_IMPACT=""
           SYNCED_TARGETS=""
-
-          # Clean path lists for language propagation (no markdown formatting)
           NEW_PATHS=""
           DELETED_PATHS=""
 
@@ -107,14 +128,14 @@ jobs:
             weight=$(KEY="$rel" yq '.weights[env(KEY)] // ""' "$CONFIG")
             if [[ -z "$weight" || "$weight" == "null" ]]; then
               weight="$DEFAULT_WEIGHT"
-              WARNINGS="${WARNINGS}- \`$rel\` has no weight mapping (using default $DEFAULT_WEIGHT)\n"
+              WARNINGS="${WARNINGS}  - $rel has no weight mapping (using default $DEFAULT_WEIGHT)\n"
             fi
 
             # Detect new vs existing
             is_new=false
             if [[ ! -f "$target_path" ]]; then
               is_new=true
-              NEW_FILES="${NEW_FILES}- \`$target_rel\`\n"
+              NEW_FILES="${NEW_FILES}  - $target_rel\n"
               NEW_PATHS="${NEW_PATHS}${target_rel}\n"
             fi
 
@@ -127,15 +148,7 @@ jobs:
             # For existing files: check if content actually changed
             if [[ "$is_new" == "false" ]]; then
               if ! git -C "$WEBSITE" diff --quiet "content/en/docs/$target_rel" 2>/dev/null; then
-                CHANGED_FILES="${CHANGED_FILES}- \`$target_rel\`\n"
-
-                # Flag translation impact
-                for lang in $LANGUAGES; do
-                  [[ "$lang" == "en" ]] && continue
-                  if [[ -f "$WEBSITE/content/$lang/docs/$target_rel" ]]; then
-                    TRANSLATION_IMPACT="${TRANSLATION_IMPACT}- **$lang**: \`$target_rel\` may need re-translation\n"
-                  fi
-                done
+                CHANGED_FILES="${CHANGED_FILES}  - $target_rel\n"
               fi
             fi
           done < <(find "$SOURCE" -name "*.md" -not -path "*/.git/*" -type f | sort)
@@ -156,7 +169,7 @@ jobs:
               mkdir -p "$(dirname "$target")"
               printf '%s\ntitle: "%s"\ndescription: "%s"\nweight: %s\n%s\n' \
                 '---' "$ho_title" "$ho_desc" "$ho_weight" '---' > "$target"
-              NEW_FILES="${NEW_FILES}- \`$ho_path\` (hugo_only stub)\n"
+              NEW_FILES="${NEW_FILES}  - $ho_path (hugo_only stub)\n"
               NEW_PATHS="${NEW_PATHS}${ho_path}\n"
             fi
           done
@@ -165,7 +178,7 @@ jobs:
           while IFS= read -r existing; do
             existing_rel="${existing#$TARGET/}"
             if ! echo -e "$SYNCED_TARGETS" | grep -qxF "$existing_rel"; then
-              DELETED_FILES="${DELETED_FILES}- \`$existing_rel\`\n"
+              DELETED_FILES="${DELETED_FILES}  - $existing_rel\n"
               DELETED_PATHS="${DELETED_PATHS}${existing_rel}\n"
               rm "$existing"
             fi
@@ -215,112 +228,41 @@ jobs:
 
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
 
-          # Store PR body components
-          {
-            echo "DIFF_STAT<<EOFSTAT"
-            git diff --stat content/
-            echo "$UNTRACKED" | sed '/^$/d' | sed 's/^/new file: /'
-            echo "EOFSTAT"
+          # Build commit message body for audit trail
+          BODY=""
+          [[ -n "$CHANGED_FILES" ]] && BODY="${BODY}\nModified:\n${CHANGED_FILES}"
+          [[ -n "$NEW_FILES" ]] && BODY="${BODY}\nNew:\n${NEW_FILES}"
+          [[ -n "$DELETED_FILES" ]] && BODY="${BODY}\nDeleted:\n${DELETED_FILES}"
+          [[ -n "$WARNINGS" ]] && BODY="${BODY}\nWarnings:\n${WARNINGS}"
 
-            echo "CHANGED<<EOFCHANGED"
-            echo -e "$CHANGED_FILES"
-            echo "EOFCHANGED"
+          echo "COMMIT_BODY<<EOFBODY" >> "$GITHUB_OUTPUT"
+          echo -e "$BODY" >> "$GITHUB_OUTPUT"
+          echo "EOFBODY" >> "$GITHUB_OUTPUT"
 
-            echo "NEW<<EOFNEW"
-            echo -e "$NEW_FILES"
-            echo "EOFNEW"
-
-            echo "DELETED<<EOFDELETED"
-            echo -e "$DELETED_FILES"
-            echo "EOFDELETED"
-
-            echo "WARNINGS<<EOFWARN"
-            echo -e "$WARNINGS"
-            echo "EOFWARN"
-
-            echo "TRANSLATIONS<<EOFTRANS"
-            echo -e "$TRANSLATION_IMPACT"
-            echo "EOFTRANS"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Create or update sync PR
+      # ── Push directly to main (no PR, no manual merge needed) ─────────
+      # Content is already reviewed in docplatform-docs. The sync is a
+      # mechanical copy. Cloudflare Pages auto-deploys on push to main.
+      - name: Commit and push to main
         if: steps.sync.outputs.has_changes == 'true'
         working-directory: website
         env:
           GH_TOKEN: ${{ secrets.WEBSITE_REPO_TOKEN }}
-          SYNC_DIFF_STAT: ${{ steps.sync.outputs.DIFF_STAT }}
-          SYNC_CHANGED: ${{ steps.sync.outputs.CHANGED }}
-          SYNC_NEW: ${{ steps.sync.outputs.NEW }}
-          SYNC_DELETED: ${{ steps.sync.outputs.DELETED }}
-          SYNC_WARNINGS: ${{ steps.sync.outputs.WARNINGS }}
-          SYNC_TRANSLATIONS: ${{ steps.sync.outputs.TRANSLATIONS }}
+          COMMIT_BODY: ${{ steps.sync.outputs.COMMIT_BODY }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
-          BRANCH="docs-sync/pending"
           SOURCE_SHA="${COMMIT_SHA::7}"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Create branch, stage ONLY docs content, commit
-          git checkout -B "$BRANCH"
+          # Stage only docs content directories (never touch other site files)
           git add content/en/docs/ content/fr/docs/ content/de/docs/ content/es/docs/ content/ru/docs/ content/uk/docs/
-          git diff --cached --quiet && { echo "No staged changes"; exit 0; }
-          git commit -m "docs: sync from docplatform-docs@${SOURCE_SHA}"
-          git push --force origin "$BRANCH"
 
-          # Build PR body from env vars
-          PR_BODY="## Docs sync from docplatform-docs
+          # Check if staging produced actual changes
+          git diff --cached --quiet && { echo "No staged changes after add"; exit 0; }
 
-          Source commit: [\`${SOURCE_SHA}\`](https://github.com/Valoryx-org/docplatform-docs/commit/${COMMIT_SHA})
+          # Commit with audit trail: source SHA + summary of what changed
+          git commit -m "docs: sync from docplatform-docs@${SOURCE_SHA}" -m "${COMMIT_BODY}"
 
-          ### Changes
-          \`\`\`
-          ${SYNC_DIFF_STAT}
-          \`\`\`"
-
-          [[ -n "$SYNC_CHANGED" ]] && PR_BODY="${PR_BODY}
-
-          ### Modified
-          ${SYNC_CHANGED}"
-
-          [[ -n "$SYNC_NEW" ]] && PR_BODY="${PR_BODY}
-
-          ### New pages
-          ${SYNC_NEW}"
-
-          [[ -n "$SYNC_DELETED" ]] && PR_BODY="${PR_BODY}
-
-          ### Deleted pages
-          ${SYNC_DELETED}"
-
-          [[ -n "$SYNC_TRANSLATIONS" ]] && PR_BODY="${PR_BODY}
-
-          ### Translation impact
-          The following translated pages may need updating:
-          ${SYNC_TRANSLATIONS}"
-
-          [[ -n "$SYNC_WARNINGS" ]] && PR_BODY="${PR_BODY}
-
-          ### Warnings
-          ${SYNC_WARNINGS}"
-
-          PR_BODY="${PR_BODY}
-
-          ---
-          Auto-generated by [docs-sync workflow](https://github.com/Valoryx-org/docplatform-docs/actions)."
-
-          # Reuse existing PR or create new one
-          EXISTING_PR=$(gh pr list --repo Valoryx-org/valoryx.org --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
-
-          if [[ -n "$EXISTING_PR" && "$EXISTING_PR" != "null" ]]; then
-            gh pr edit "$EXISTING_PR" --repo Valoryx-org/valoryx.org --body "$PR_BODY"
-            echo "Updated existing PR #$EXISTING_PR"
-          else
-            gh pr create \
-              --repo Valoryx-org/valoryx.org \
-              --title "docs: sync from docplatform-docs@${SOURCE_SHA}" \
-              --body "$PR_BODY" \
-              --head "$BRANCH" \
-              --base main
-          fi
+          # Push directly to main → Cloudflare Pages auto-deploys
+          git push origin main
