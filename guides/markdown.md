@@ -1,11 +1,11 @@
 ---
 title: Markdown & Components
-description: Write documentation with CommonMark Markdown, YAML frontmatter, wikilinks, and 15+ built-in interactive components.
+description: Write documentation with CommonMark Markdown, YAML frontmatter, wikilinks, and 15 built-in interactive components.
 ---
 
 # Markdown & Components
 
-DocPlatform uses CommonMark-compliant Markdown with YAML frontmatter, wikilinks, and 15+ custom components for rich, interactive documentation.
+DocPlatform uses CommonMark-compliant Markdown with YAML frontmatter, wikilinks, and 15 custom components for rich, interactive documentation.
 
 ## Markdown basics
 
@@ -57,7 +57,7 @@ Headings automatically generate anchor IDs for deep linking: `## My Section` →
 
 ### Code blocks
 
-Fenced code blocks with language-specific syntax highlighting (200+ languages via Shiki):
+Fenced code blocks with language-specific syntax highlighting (200+ languages via Chroma):
 
 ````markdown
 ```go
@@ -158,12 +158,12 @@ The `id` field is auto-generated as a ULID when a page is created. On git import
 
 ## Custom components
 
-DocPlatform includes 15+ built-in components that render as rich, interactive elements in both the web editor preview and published docs.
+DocPlatform includes 15 built-in components that render as rich, interactive elements in both the web editor preview and published docs.
 
 Components use a directive syntax:
 
 ```
-:::component-name{attributes}
+:::component-name[attributes]
 Content goes here.
 :::
 ```
@@ -173,24 +173,24 @@ Content goes here.
 Highlight important information with styled callout boxes.
 
 ```markdown
-:::callout{type="info"}
+:::callout[info]
 DocPlatform automatically indexes all content for search.
 :::
 
-:::callout{type="warning"}
+:::callout[warning]
 Changing the workspace slug will break existing published URLs.
 :::
 
-:::callout{type="danger"}
+:::callout[danger]
 Running `rebuild` drops the pages table and re-indexes from the filesystem.
 This is irreversible.
 :::
 
-:::callout{type="tip"}
+:::callout[tip]
 Press Cmd+K to open search from anywhere in the editor.
 :::
 
-:::callout{type="note"}
+:::callout[note]
 This feature is available in Community Edition.
 :::
 ```
@@ -201,7 +201,7 @@ This feature is available in Community Edition.
 
 Standard fenced code blocks are automatically enhanced with:
 
-- **Syntax highlighting** — 200+ languages via Shiki
+- **Syntax highlighting** — 200+ languages via Chroma
 - **Copy button** — one-click copy to clipboard
 - **Language label** — displayed in the top-right corner
 - **Line numbers** — optional, enabled with `showLineNumbers`
@@ -223,17 +223,17 @@ Group related content into switchable tab panels.
 
 ```markdown
 :::tabs
-::tab{label="macOS"}
+::tab[macOS]
 ```bash
 brew install docplatform
 ```
 ::
-::tab{label="Linux"}
+::tab[Linux]
 ```bash
 curl -fsSL https://valoryx.org/install.sh | sh
 ```
 ::
-::tab{label="Docker"}
+::tab[Docker]
 ```bash
 docker pull ghcr.io/valoryx-org/docplatform:latest
 ```
@@ -248,12 +248,12 @@ Tab selection persists across page navigation — if a user selects "Docker", al
 Collapsible sections for supplementary content.
 
 ```markdown
-:::accordion{title="What happens during initialization?"}
+:::accordion[What happens during initialization?]
 The `init` command creates a `.docplatform` directory, initializes the SQLite
 database, generates an RS256 signing key, and optionally clones a git repository.
 :::
 
-:::accordion{title="Can I use an existing database?"}
+:::accordion[Can I use an existing database?]
 No. DocPlatform manages its own SQLite database and does not support connecting
 to external database servers in Community Edition.
 :::
@@ -265,16 +265,16 @@ Grid of linked cards for navigation pages or feature overviews.
 
 ```markdown
 :::cards
-::card{title="Getting Started" link="/getting-started"}
+::card[Getting Started, link="/getting-started"]
 Install and configure DocPlatform in under 10 minutes.
 ::
-::card{title="Git Integration" link="/guides/git-integration"}
+::card[Git Integration, link="/guides/git-integration"]
 Bidirectional sync between the web editor and your git repository.
 ::
-::card{title="Publishing" link="/guides/publishing"}
+::card[Publishing, link="/guides/publishing"]
 Publish beautiful documentation sites with dark mode and SEO.
 ::
-::card{title="Search" link="/guides/search"}
+::card[Search, link="/guides/search"]
 Instant full-text search with permission filtering.
 ::
 :::
@@ -286,16 +286,16 @@ Numbered step-by-step instructions with visual progress indicators.
 
 ```markdown
 :::steps
-::step{title="Download"}
+::step[Download]
 Get the latest binary from GitHub Releases.
 ::
-::step{title="Initialize"}
+::step[Initialize]
 Run `docplatform init` to create your workspace.
 ::
-::step{title="Start the server"}
+::step[Start the server]
 Run `docplatform serve` and open http://localhost:3000.
 ::
-::step{title="Register"}
+::step[Register]
 Create your admin account — the first user becomes SuperAdmin.
 ::
 :::
@@ -306,7 +306,7 @@ Create your admin account — the first user becomes SuperAdmin.
 Document API endpoints with method badges, parameters, and response examples.
 
 ```markdown
-:::api{method="POST" path="/api/auth/login"}
+:::api[POST /api/auth/login]
 Authenticate a user and receive JWT tokens.
 
 **Request body:**
@@ -381,21 +381,6 @@ Block math:
 $$
 \int_{0}^{\infty} e^{-x^2} dx = \frac{\sqrt{\pi}}{2}
 $$
-```
-
-### Version selector
-
-Display version-specific content with a dropdown selector.
-
-```markdown
-:::version-selector
-::version{label="v0.5" default}
-Current stable release with all Community Edition features.
-::
-::version{label="v0.4"}
-Previous release. Upgrade recommended.
-::
-:::
 ```
 
 ## Component usage in the editor

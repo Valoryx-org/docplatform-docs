@@ -23,7 +23,7 @@ Analytics data is collected in a separate `analytics.db` SQLite database (not in
 ### What is NOT tracked
 
 - IP addresses (never stored)
-- User agents (truncated to browser family only)
+- User agents are not stored
 - Cookies or cross-session identifiers (without consent)
 - Personally identifiable information
 

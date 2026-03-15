@@ -12,7 +12,7 @@ DocPlatform reads configuration from environment variables. Set them in your she
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `3000` | HTTP listen port |
-| `HOST` | `0.0.0.0` | HTTP listen address. Set to `127.0.0.1` to restrict to localhost. |
+| `HOST` | `0.0.0.0` | **Not yet implemented.** Reserved for future use. |
 | `DATA_DIR` | `.docplatform` | Root directory for all DocPlatform data (database, backups, workspaces, keys) |
 | `BASE_URL` | `http://localhost:{PORT}` | Public URL used for OIDC callbacks, invitation links, and email templates. Set to your production URL (e.g., `https://docs.example.com`). |
 | `BASE_DOMAIN` | — | Custom domain for published docs (e.g., `docs.yourcompany.com`). When set, published docs use this domain for canonical URLs and sitemap entries. |
@@ -23,8 +23,8 @@ DocPlatform reads configuration from environment variables. Set them in your she
 
 | Variable | Default | Description |
 |---|---|---|
-| `JWT_KEY_PATH` | `{DATA_DIR}/jwt-key.pem` | Path to the RS256 private key for JWT signing. Auto-generated on first run if missing (2048-bit RSA). |
-| `JWT_ACCESS_TTL` | `1800` | Access token lifetime in seconds (default: 30 minutes) |
+| `JWT_KEY_PATH` | `{DATA_DIR}/jwt-private.pem` | Path to the RS256 private key for JWT signing. Auto-generated on first run if missing (2048-bit RSA). |
+| `JWT_ACCESS_TTL` | `900` | Access token lifetime in seconds (default: 15 minutes) |
 | `JWT_REFRESH_TTL` | `604800` | Refresh token lifetime in seconds (default: 7 days) |
 | `ARGON2_MEMORY` | `65536` | Argon2id memory parameter in KiB (default: 64 MB) |
 | `ARGON2_TIME` | `3` | Argon2id iteration count |
@@ -61,11 +61,11 @@ See [Authentication](authentication.md) for setup instructions.
 |---|---|---|
 | `GIT_SSH_KEY_PATH` | `~/.ssh/docplatform_deploy_key` | Path to the SSH private key for git operations. Required for private repos over SSH. |
 | `GIT_SSH_KNOWN_HOSTS` | — | Path to known_hosts file for strict host verification. If not set, uses built-in pinned keys for GitHub, GitLab, and Bitbucket. |
-| `GIT_SYNC_INTERVAL` | `300` | Default polling interval in seconds for remote sync (minimum: 10). Overridden by per-workspace `sync_interval`. Set to `0` for webhook-only sync (no polling). |
+| `GIT_SYNC_INTERVAL` | `300` | Default polling interval in seconds for remote sync (minimum: 10). Overridden by per-workspace `sync_interval`. |
 | `GIT_AUTO_COMMIT` | `true` | Default auto-commit behavior. Overridden by per-workspace `git_auto_commit`. |
 | `GIT_WEBHOOK_SECRET` | — | Shared secret for verifying webhook payloads (HMAC-SHA256) from GitHub, GitLab, or Bitbucket. |
-| `GIT_COMMIT_NAME` | `DocPlatform` | Git committer name for auto-commits |
-| `GIT_COMMIT_EMAIL` | `docplatform@local` | Git committer email for auto-commits |
+| `GIT_COMMIT_NAME` | `DocPlatform` | Hardcoded, not configurable. Shown here for reference only. |
+| `GIT_COMMIT_EMAIL` | `docplatform@local` | Hardcoded, not configurable. Shown here for reference only. |
 
 ## Email (optional)
 
@@ -113,10 +113,10 @@ Enable subscription billing with Stripe. When `STRIPE_SECRET_KEY` is not set, bi
 |---|---|---|
 | `STRIPE_SECRET_KEY` | — | Stripe secret API key (starts with `sk_test_` or `sk_live_`) |
 | `STRIPE_WEBHOOK_SECRET` | — | Stripe webhook endpoint signing secret (starts with `whsec_`) |
-| `STRIPE_PRICE_TEAM` | — | Stripe Price ID for Team plan monthly ($99/mo) |
-| `STRIPE_PRICE_BUSINESS` | — | Stripe Price ID for Business plan monthly ($299/mo) |
-| `STRIPE_PRICE_TEAM_ANNUAL` | — | Stripe Price ID for Team plan annual ($990/yr) |
-| `STRIPE_PRICE_BUSINESS_ANNUAL` | — | Stripe Price ID for Business plan annual ($2,990/yr) |
+| `STRIPE_PRICE_TEAM` | — | Stripe Price ID for Team plan monthly ($29/mo) |
+| `STRIPE_PRICE_BUSINESS` | — | Stripe Price ID for Business plan monthly ($79/mo) |
+| `STRIPE_PRICE_TEAM_ANNUAL` | — | Stripe Price ID for Team plan annual ($290/yr) |
+| `STRIPE_PRICE_BUSINESS_ANNUAL` | — | Stripe Price ID for Business plan annual ($790/yr) |
 | `TRIAL_DURATION_DAYS` | `14` | Number of free trial days for new paid subscriptions |
 | `FF_BILLING` | `true` | Master billing switch. Set to `false` to disable billing entirely and treat all orgs as unlimited. |
 
@@ -152,12 +152,6 @@ Configure Caddy integration for automatic TLS provisioning on custom domains.
 | Variable | Default | Description |
 |---|---|---|
 | `FF_METRICS` | `false` | Enable Prometheus metrics at `/metrics` (super admin authentication required). |
-
-## Frontmatter handling
-
-| Variable | Default | Description |
-|---|---|---|
-| `FRONTMATTER_ERROR_MODE` | `strict` | How to handle invalid YAML frontmatter: `strict` restricts the page to admin-only access (prevents accidental exposure); `lenient` keeps the last-known-good frontmatter and shows a warning. |
 
 ## Development
 

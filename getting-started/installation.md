@@ -110,17 +110,17 @@ Build from source if you want to contribute or run a development version.
 
 **Prerequisites:**
 
-- Go 1.25+
-- Node.js 20+ and pnpm (for frontend build)
+- Go 1.26+
+- Node.js 20+ (frontend assets are pre-built; no pnpm required)
 - Git
 - Make
 
 ```bash
 # Clone the repository
 git clone https://github.com/Valoryx-org/docplatform.git
-cd docplatform/Phase05/src
+cd docplatform
 
-# Build the binary (compiles Go + embeds Next.js static export)
+# Build the binary (compiles Go + embeds static frontend assets)
 make build
 
 # Verify
@@ -132,10 +132,14 @@ make build
 For hot-reloading during development:
 
 ```bash
+# Simple run (no hot reload)
 make dev
+
+# Go hot reload with air
+make dev-hot
 ```
 
-This starts the Go server with live reload and the Next.js dev server with HMR.
+`make dev` starts the server for development. `make dev-hot` starts the Go server with hot reload via air and the Vite dev server with HMR.
 
 ## Next steps
 

@@ -105,7 +105,7 @@ sudo nano /etc/docplatform/.env
 PORT=3000
 DATA_DIR=/var/lib/docplatform
 GIT_SSH_KEY_PATH=/etc/docplatform/deploy_key
-BACKUP_RETENTION_DAYS=30
+BACKUP_RETENTION_DAYS=30  # default is 7
 
 # Optional: SMTP for emails
 # SMTP_HOST=smtp.example.com
@@ -150,7 +150,7 @@ ReadWritePaths=/var/lib/docplatform
 
 # Graceful shutdown
 KillSignal=SIGTERM
-TimeoutStopSec=30
+TimeoutStopSec=20
 
 [Install]
 WantedBy=multi-user.target

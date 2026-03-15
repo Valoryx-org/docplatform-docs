@@ -45,7 +45,7 @@ DocPlatform Community Edition is built for:
 │                                                  │
 │   ┌────────────┐  ┌──────────┐  ┌────────────┐  │
 │   │ Web Editor  │  │ SQLite   │  │ Bleve      │  │
-│   │ (Next.js)   │  │ Database │  │ Search     │  │
+│   │ (Tiptap)    │  │ Database │  │ Search     │  │
 │   └──────┬──────┘  └────┬─────┘  └──────┬─────┘  │
 │          │              │               │        │
 │          └──────┬───────┴───────┬───────┘        │
@@ -120,13 +120,13 @@ For the complete walkthrough, see the [Getting Started](getting-started/index.md
 
 - **Pageview analytics** — Track page views and top pages with GDPR-compliant cookie consent
 - **Search analytics** — Monitor search queries, top searches, and search frequency
-- **Stripe billing** — Community (free), Team ($99/mo), Business ($299/mo) with annual pricing (2 months free)
+- **Stripe billing** — Community (free), Team ($29/mo), Business ($79/mo) with annual pricing (2 months free)
 - **Feature gating** — Analytics, custom domains, and advanced AI locked to paid plans
 - **14-day free trial** — Configurable trial period for paid plans
 
 ### Operations
 
-- **Health diagnostics** — 9-point `doctor` command checks FS/DB consistency, search health, broken links
+- **Health diagnostics** — 10-point `doctor` command checks FS/DB consistency, search health, broken links
 - **Daily backups** — Automated SQLite backups with configurable retention
 - **Graceful shutdown** — Clean signal handling for zero-downtime deployments
 - **Structured logging** — JSON logs with request IDs for observability

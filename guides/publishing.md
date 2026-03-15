@@ -17,7 +17,7 @@ http://localhost:3000/p/my-docs/quickstart    → docs/quickstart.md
 http://localhost:3000/p/my-docs/api/auth      → docs/api/auth.md
 ```
 
-Pages are rendered from Markdown to HTML on request using goldmark (CommonMark-compliant) with Shiki syntax highlighting (One Dark Pro / GitHub Light themes) for code blocks.
+Pages are rendered from Markdown to HTML on request using goldmark (CommonMark-compliant) with Chroma syntax highlighting (Dracula theme) for code blocks.
 
 ### Page status lifecycle
 
@@ -115,7 +115,7 @@ navigation:
 
 ### Syntax highlighting
 
-Code blocks are highlighted using **Shiki** (One Dark Pro / GitHub Light themes). Over 200 languages are supported.
+Code blocks are highlighted using **Chroma** (Dracula theme). Over 200 languages are supported.
 
 Specify the language after the opening triple backticks:
 
@@ -165,24 +165,24 @@ Restart the server for this change to take effect. No rebuild required.
 
 ## Built-in components
 
-Published docs support 15+ custom components that render as rich, interactive elements. Here are the most commonly used ones (see [Markdown & Components](markdown.md) for the full list):
+Published docs support 15 custom components that render as rich, interactive elements. Here are the most commonly used ones (see [Markdown & Components](markdown.md) for the full list):
 
 ### Callout
 
 ```markdown
-:::callout{type="info"}
+:::callout[info]
 This is an informational callout.
 :::
 
-:::callout{type="warning"}
+:::callout[warning]
 Be careful with this operation.
 :::
 
-:::callout{type="danger"}
+:::callout[danger]
 This action is irreversible.
 :::
 
-:::callout{type="tip"}
+:::callout[tip]
 Pro tip: use keyboard shortcuts for faster editing.
 :::
 ```
@@ -193,13 +193,13 @@ Pro tip: use keyboard shortcuts for faster editing.
 
 ```markdown
 :::tabs
-::tab{label="npm"}
+::tab[npm]
 npm install docplatform
 ::
-::tab{label="yarn"}
+::tab[yarn]
 yarn add docplatform
 ::
-::tab{label="pnpm"}
+::tab[pnpm]
 pnpm add docplatform
 ::
 :::
@@ -208,7 +208,7 @@ pnpm add docplatform
 ### Accordion
 
 ```markdown
-:::accordion{title="How does sync work?"}
+:::accordion[How does sync work?]
 DocPlatform uses a hybrid git engine that combines go-git for small repositories
 with native git CLI for large ones. Changes are synced via polling or webhooks.
 :::
@@ -218,10 +218,10 @@ with native git CLI for large ones. Changes are synced via polling or webhooks.
 
 ```markdown
 :::cards
-::card{title="Getting Started" link="/getting-started"}
+::card[Getting Started, link="/getting-started"]
 Install and configure DocPlatform in under 10 minutes.
 ::
-::card{title="User Guide" link="/guides/editor"}
+::card[User Guide, link="/guides/editor"]
 Learn the web editor, git sync, and publishing features.
 ::
 :::
@@ -231,13 +231,13 @@ Learn the web editor, git sync, and publishing features.
 
 ```markdown
 :::steps
-::step{title="Install"}
+::step[Install]
 Download the binary or pull the Docker image.
 ::
-::step{title="Initialize"}
+::step[Initialize]
 Run `docplatform init` to create your workspace.
 ::
-::step{title="Start"}
+::step[Start]
 Run `docplatform serve` and open the browser.
 ::
 :::
@@ -246,7 +246,7 @@ Run `docplatform serve` and open the browser.
 ### API Block
 
 ```markdown
-:::api{method="GET" path="/api/v1/content/{workspace}/{...path}"}
+:::api[GET /api/v1/content/{workspace}/{...path}]
 Retrieve a single page by workspace and path.
 
 **Parameters:**

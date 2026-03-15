@@ -38,10 +38,10 @@ services:
       - DATA_DIR=/data
       - PORT=3000
       - GIT_SSH_KEY_PATH=/etc/docplatform/deploy_key
-      - BACKUP_RETENTION_DAYS=30
+      - BACKUP_RETENTION_DAYS=30  # default is 7
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      test: ["CMD", "docplatform", "doctor"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -60,7 +60,7 @@ docker compose up -d
 | Property | Value |
 |---|---|
 | **Registry** | `ghcr.io/valoryx-org/docplatform` |
-| **Base image** | Alpine Linux 3.19 |
+| **Base image** | Alpine Linux 3.20 |
 | **Architectures** | `linux/amd64`, `linux/arm64` |
 | **Size** | ~120 MB compressed |
 | **User** | Non-root (`docplatform`, UID 1000) |
@@ -88,7 +88,7 @@ The `/data` directory contains:
 ```
 /data/
 ├── data.db              # SQLite database
-├── jwt-key.pem          # Auto-generated RS256 signing key
+├── jwt-private.pem          # Auto-generated RS256 signing key
 ├── backups/             # Daily backup files
 └── workspaces/
     └── {workspace-id}/
@@ -155,9 +155,9 @@ DocPlatform exposes health endpoints:
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/health` | Basic liveness check (server is running) |
-| `GET /api/readyz` | Readiness check (database and search are initialized, reconciliation complete) |
+| `GET /api/ready` | Readiness check (database and search are initialized, reconciliation complete) |
 
-Use these for Docker healthchecks, load balancer probes, or orchestrator liveness/readiness probes.
+Use these for load balancer probes or orchestrator liveness/readiness probes. Note that the Dockerfile's built-in healthcheck uses `docplatform doctor` rather than wget.
 
 ## With a reverse proxy
 
@@ -230,15 +230,14 @@ Data in the volume persists across container recreations.
 Build your own image from the Dockerfile:
 
 ```bash
-cd Phase05/src
+cd docplatform
 docker build -t docplatform:custom .
 ```
 
-The Dockerfile uses a multi-stage build:
+The Dockerfile uses a 2-stage build:
 
-1. **Build stage** — Go compilation with CGO disabled
-2. **Frontend stage** — Next.js static export
-3. **Runtime stage** — Alpine Linux with the compiled binary and static assets
+1. **Build stage** — Go compilation with CGO disabled (static frontend assets are embedded at compile time)
+2. **Runtime stage** — Alpine Linux with the compiled binary
 
 ## Logs
 

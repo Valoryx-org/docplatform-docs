@@ -5,7 +5,7 @@ description: Configure DocPlatform's 6-level role hierarchy, page-level access c
 
 # Roles & Permissions
 
-DocPlatform uses role-based access control (RBAC) powered by Casbin, an in-process authorization engine. Permissions are evaluated in under 0.1ms per check with no external service.
+DocPlatform uses role-based access control (RBAC) powered by custom RBAC, an in-process authorization engine. Permissions are evaluated in under 0.1ms per check with no external service.
 
 ## Role hierarchy
 
@@ -55,7 +55,7 @@ The **Space Admin** role is unique: it grants admin-level control but only over 
 Path patterns are assigned when adding a member:
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/admin/invitations \
+curl -X POST http://localhost:3000/api/v1/workspaces/:id/invitations \
   -H "Authorization: Bearer {token}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -82,7 +82,7 @@ When inviting a user to a workspace, specify their role:
 **API:**
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/admin/invitations \
+curl -X POST http://localhost:3000/api/v1/workspaces/:id/invitations \
   -H "Authorization: Bearer {token}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -109,23 +109,21 @@ Override workspace-level permissions on individual pages using frontmatter. Fron
 
 ### Access control syntax
 
-Use per-operation access rules to control who can read, write, or administer a page:
+Use role-based and user-based access rules to control who can access a page:
 
 ```yaml
 ---
 title: Internal Security Policy
 access:
-  read: ["security-team", "engineering-leads"]
-  write: ["security-team"]
-  admin: ["@01HY5K3M7Q8P"]
+  roles: ["security-team", "engineering-leads"]
+  users: ["@01HY5K3M7Q8P"]
 ---
 ```
 
 | Field | Value type | Description |
 |---|---|---|
-| `access.read` | list of role names | Roles that can view this page |
-| `access.write` | list of role names | Roles that can edit this page |
-| `access.admin` | list of role names or `@user_id` | Users/roles that can manage page settings |
+| `access.roles` | list of role names | Roles that can access this page |
+| `access.users` | list of `@user_id` | Individual users that can access this page |
 
 **Rules:**
 - Prefix user IDs with `@` to target individual users
@@ -148,8 +146,7 @@ title: Getting Started
 ---
 title: Infrastructure Runbook
 access:
-  read: ["security-team", "sre-team"]
-  write: ["security-team"]
+  roles: ["security-team", "sre-team"]
 ---
 ```
 
@@ -159,9 +156,8 @@ access:
 ---
 title: Budget Proposal
 access:
-  read: ["finance-team"]
-  write: ["@01HY5K3M7Q8P"]
-  admin: ["@01HY5K3M7Q8P"]
+  roles: ["finance-team"]
+  users: ["@01HY5K3M7Q8P"]
 ---
 ```
 
@@ -209,7 +205,7 @@ Auth Middleware
     │
     ▼
 Permission Middleware
-(Casbin check: user + role + resource + action)
+(custom RBAC check: user + role + resource + action)
     │
     ├── Allowed → proceed to handler
     │
@@ -221,7 +217,7 @@ Permission Middleware
 1. **Is workspace public + action is read?** → assign anonymous viewer role
 2. **Is user SuperAdmin?** → ALLOW (bypasses all checks)
 3. **Is user WorkspaceAdmin?** → ALLOW for this workspace
-4. **Does user's role permit action?** → Casbin RBAC check with `keyMatch2(path)`
+4. **Does user's role permit action?** → custom RBAC RBAC check with `keyMatch2(path)`
 5. **Do path_patterns match?** (Space Admin only) → check glob patterns
 6. **Does page frontmatter have access rules?** → check whitelist, RESTRICT within role
 
@@ -231,7 +227,7 @@ Frontmatter RESTRICTS within role, never GRANTS beyond it. A malformed frontmatt
 
 | Metric | Value |
 |---|---|
-| **Engine** | Casbin (in-process, in-memory) |
+| **Engine** | custom RBAC (in-process, in-memory) |
 | **Evaluation time** | < 0.1ms per check |
 | **Batch check** | < 1ms per 100 pages |
 | **Cache** | Versioned (auto-invalidated on role or permission change) |
@@ -239,7 +235,7 @@ Frontmatter RESTRICTS within role, never GRANTS beyond it. A malformed frontmatt
 
 ## Permission caching
 
-Casbin policies are loaded from SQLite into memory on server startup. Changes to roles or frontmatter access declarations trigger a cache invalidation:
+custom RBAC policies are loaded from SQLite into memory on server startup. Changes to roles or frontmatter access declarations trigger a cache invalidation:
 
 1. Admin changes a user's role → permission cache version incremented
 2. Editor updates page frontmatter with new `access` rules → cache invalidated for that page
@@ -258,8 +254,7 @@ The cache is versioned, not time-based — there's no stale-permission window.
 ---
 title: Incident Response Playbook
 access:
-  read: ["sre-team", "workspace_admin"]
-  write: ["sre-team"]
+  roles: ["sre-team", "workspace_admin"]
 ---
 ```
 
@@ -304,7 +299,7 @@ These limits are hardcoded (no license key required). Viewers and commenters are
 ### "403 Forbidden" on a page I should have access to
 
 1. Check your role: Profile → Workspace Membership
-2. Check the page's frontmatter: does `access.read` include your role?
+2. Check the page's frontmatter: does `access.roles` include your role?
 3. If using Space Admin, verify your `path_patterns` cover the page's path
 4. Ask a workspace admin to verify your role assignment
 

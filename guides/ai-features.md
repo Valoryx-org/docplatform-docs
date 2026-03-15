@@ -24,7 +24,7 @@ Restart the server. AI features appear in the editor toolbar and are accessible 
 
 | Provider | Variable | Default model |
 |---|---|---|
-| **Anthropic** (Claude) | `AI_PROVIDER=anthropic` | Claude Sonnet (latest) |
+| **Anthropic** (Claude) | `AI_PROVIDER=anthropic` | Claude Sonnet 4.5 (claude-sonnet-4-5-20250514) |
 | **OpenAI** | `AI_PROVIDER=openai` | GPT-4o |
 
 Override the model with `AI_MODEL` (e.g., `claude-opus-4-6`, `gpt-4-turbo`).
@@ -43,10 +43,12 @@ Select text in the editor and use the AI toolbar to transform it:
 
 | Operation | Description |
 |---|---|
-| **Rewrite** | Rephrase the selected text while preserving meaning |
 | **Improve** | Enhance clarity, grammar, and readability |
-| **Shorten** | Condense the text while keeping key information |
+| **Simplify** | Simplify language while preserving meaning |
 | **Expand** | Elaborate on the selected text with more detail |
+| **Summarize** | Condense the text into a brief summary |
+| **Fix grammar** | Correct grammar and spelling errors |
+| **Translate** | Translate content to a target language |
 
 ### API usage
 
@@ -62,7 +64,7 @@ POST /api/v1/ai/writing-assist
 }
 ```
 
-**Operations:** `rewrite`, `improve`, `shorten`, `expand`
+**Operations:** `improve`, `simplify`, `expand`, `summarize`, `fix_grammar`, `translate`
 
 **Response:**
 
@@ -151,42 +153,49 @@ Add to `.cursor/mcp.json` in your project:
 }
 ```
 
-### Available MCP tools (13)
+### Available MCP tools (20)
 
-The MCP server exposes 13 tools organized into four categories:
+The MCP server exposes 20 tools organized into four categories:
 
 #### Read & navigate
 
 | Tool | Description |
 |---|---|
-| `get_page` | Fetch a single page by path — returns Markdown content, frontmatter, and metadata |
-| `list_pages` | List all pages in the workspace with title, path, and status |
-| `get_page_tree` | Hierarchical page tree showing parent-child relationships |
-| `get_page_metadata` | Frontmatter, tags, status, word count, and timestamps |
-| `get_page_links` | Outbound and inbound wikilinks for a page |
+| `docplatform_get_page` | Fetch a single page by path — returns Markdown content, frontmatter, and metadata |
+| `docplatform_list_pages` | List all pages in the workspace with title, path, and status |
+| `docplatform_get_page_tree` | Hierarchical page tree showing parent-child relationships |
+| `docplatform_get_page_metadata` | Frontmatter, tags, status, word count, and timestamps |
+| `docplatform_get_page_links` | Outbound and inbound wikilinks for a page |
+| `docplatform_get_page_history` | Revision history for a page |
+| `docplatform_get_workspace_config` | Workspace settings and configuration |
 
 #### Search & discover
 
 | Tool | Description |
 |---|---|
-| `search` | Full-text search with scored results and highlighted snippets |
-| `search_by_tag` | Find pages by tag (exact match or partial) |
+| `docplatform_search` | Full-text search with scored results and highlighted snippets |
+| `docplatform_search_by_tag` | Find pages by tag (exact match or partial) |
+| `docplatform_search_by_date` | Find pages modified within a date range |
 
 #### Write & organize
 
 | Tool | Description |
 |---|---|
-| `create_page` | Create a new page with Markdown content and frontmatter |
-| `update_page` | Update page content with optimistic concurrency (hash check) |
-| `move_page` | Move/rename a page — updates all wikilinks automatically |
-| `delete_page` | Delete a page by path |
+| `docplatform_create_page` | Create a new page with Markdown content and frontmatter |
+| `docplatform_update_page` | Update page content with optimistic concurrency (hash check) |
+| `docplatform_move_page` | Move/rename a page — updates all wikilinks automatically |
+| `docplatform_delete_page` | Delete a page by path |
+| `docplatform_update_frontmatter` | Update page frontmatter fields without changing body content |
+| `docplatform_batch_update` | Update multiple pages in a single transaction |
 
 #### Maintain
 
 | Tool | Description |
 |---|---|
-| `quality_check` | Run readability scoring, dead link detection, and completeness checks |
-| `workspace_stats` | Page count, word count, tag distribution, and health summary |
+| `docplatform_quality_check` | Run readability scoring, dead link detection, and completeness checks |
+| `docplatform_workspace_stats` | Page count, word count, tag distribution, and health summary |
+| `docplatform_validate_links` | Check all internal links and wikilinks for broken references |
+| `docplatform_export_workspace` | Export workspace content as a ZIP archive |
 
 All access is authenticated via the API key and scoped to the specified workspace.
 

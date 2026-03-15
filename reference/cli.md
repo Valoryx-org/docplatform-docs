@@ -5,7 +5,7 @@ description: Complete reference for all DocPlatform CLI commands — serve, init
 
 # CLI Reference
 
-DocPlatform provides 8 CLI commands for server management, workspace initialization, diagnostics, publishing, and AI integration.
+DocPlatform provides 9 CLI commands for server management, workspace initialization, diagnostics, publishing, and AI integration.
 
 ## Global options
 
@@ -29,15 +29,13 @@ docplatform serve [flags]
 | Flag | Default | Description |
 |---|---|---|
 | `--port` | `3000` | HTTP listen port (overrides `PORT` env var) |
-| `--host` | `0.0.0.0` | HTTP listen address (overrides `HOST` env var) |
-| `--data-dir` | `.docplatform` | Data directory path (overrides `DATA_DIR` env var) |
 
 ### Behavior
 
 - Loads environment variables from `.env` file (if present)
 - Initializes SQLite database with WAL mode
 - Runs pending database migrations
-- Loads Casbin permission policies into memory
+- Loads custom RBAC permission policies into memory
 - Builds or opens the Bleve search index
 - Starts the git sync engine for all configured workspaces
 - Starts the backup scheduler (if enabled)
@@ -83,9 +81,6 @@ docplatform serve
 
 # Start on custom port
 docplatform serve --port 8080
-
-# Start with explicit data directory
-docplatform serve --data-dir /var/lib/docplatform
 ```
 
 ### Output
@@ -151,7 +146,7 @@ docplatform init \
 ```
 INFO  Data directory created     path=.docplatform
 INFO  Database initialized       path=.docplatform/data.db
-INFO  JWT key generated          path=.docplatform/jwt-key.pem
+INFO  JWT key generated          path=.docplatform/jwt-private.pem
 INFO  Workspace created          id=01KJJ10NTF... name="API Docs" slug=api-docs
 INFO  Repository cloned          url=git@github.com:your-org/api-docs.git branch=main
 INFO  Pages indexed              count=15
@@ -172,7 +167,7 @@ docplatform rebuild [flags]
 
 | Flag | Required | Default | Description |
 |---|---|---|---|
-| `--workspace-id` | No | all | ULID of a specific workspace to rebuild. Without this flag, all workspaces are rebuilt. |
+| `--workspace` | Yes | — | ULID of the workspace to rebuild (required). |
 | `--search` | No | `false` | Also drop and rebuild the Bleve search index |
 | `--data-dir` | No | `.docplatform` | Data directory path |
 
@@ -196,11 +191,8 @@ docplatform rebuild [flags]
 ### Example
 
 ```bash
-# Rebuild all workspaces
-docplatform rebuild
-
 # Rebuild a specific workspace
-docplatform rebuild --workspace-id 01KJJ10NTF31Z1QJTG4ZRQZ2Z2
+docplatform rebuild --workspace 01KJJ10NTF31Z1QJTG4ZRQZ2Z2
 ```
 
 ### Output
@@ -321,7 +313,7 @@ docplatform export [flags]
 
 | Flag | Required | Default | Description |
 |---|---|---|---|
-| `--workspace` | Yes | — | Workspace slug or ULID to export |
+| `--workspace` | Yes | — | Workspace ID (ULID) to export |
 | `--output` | No | `{workspace}-export.zip` | Output ZIP file path |
 | `--data-dir` | No | `.docplatform` | Data directory path |
 
@@ -354,7 +346,7 @@ docplatform preview [flags]
 
 | Flag | Required | Default | Description |
 |---|---|---|---|
-| `--workspace` | Yes | — | Workspace slug or ULID to preview |
+| `--workspace` | Yes | — | Workspace ID (ULID) to preview |
 | `--port` | No | `4000` | HTTP listen port |
 | `--data-dir` | No | `.docplatform` | Data directory path |
 
@@ -384,7 +376,7 @@ docplatform mcp [flags]
 
 | Flag | Required | Default | Description |
 |---|---|---|---|
-| `--workspace` | Yes | — | Workspace slug or ULID to expose |
+| `--workspace` | Yes | — | Workspace ID (ULID) to expose |
 | `--api-key` | Yes | — | API key for authentication (or set `DOCPLATFORM_API_KEY` env var) |
 | `--data-dir` | No | `.docplatform` | Data directory path |
 

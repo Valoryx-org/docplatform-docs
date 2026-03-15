@@ -118,7 +118,7 @@ Insert tables from the toolbar. Tables support:
 
 ### Code blocks
 
-Insert code blocks with the toolbar or by typing triple backticks (`` ``` ``). Select a language for syntax highlighting — Shiki supports 200+ languages.
+Insert code blocks with the toolbar or by typing triple backticks (`` ``` ``). Select a language for syntax highlighting — Chroma supports 200+ languages.
 
 ```javascript
 // Code blocks with syntax highlighting

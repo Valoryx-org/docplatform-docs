@@ -80,11 +80,10 @@ https://your-domain.com/api/webhooks/stripe
 Subscribe to these events:
 
 - `checkout.session.completed`
-- `customer.subscription.created`
+- `invoice.paid`
+- `invoice.payment_failed`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
-- `invoice.payment_succeeded`
-- `invoice.payment_failed`
 
 DocPlatform handles all webhook events idempotently — duplicate deliveries are safely ignored.
 

@@ -21,7 +21,7 @@ These items are necessary for a secure, reliable production deployment.
 ### Security
 
 - [ ] **TLS enabled** — Run behind a reverse proxy (Caddy, nginx, cloud load balancer) with HTTPS. DocPlatform does not terminate TLS itself.
-- [ ] **JWT key secured** — The `jwt-key.pem` file grants the ability to forge authentication tokens. Restrict filesystem permissions: `chmod 600`.
+- [ ] **JWT key secured** — The `jwt-private.pem` file grants the ability to forge authentication tokens. Restrict filesystem permissions: `chmod 600`.
 - [ ] **First user registered** — The first registered user becomes SuperAdmin. Register your admin account before opening the server to others.
 - [ ] **Bind to localhost** — If using a reverse proxy on the same host, set `HOST=127.0.0.1` so DocPlatform isn't directly accessible.
 
@@ -110,7 +110,7 @@ DocPlatform sets security headers automatically on all responses:
 
 - Run as a dedicated non-root user (systemd: `User=docplatform`)
 - Restrict data directory permissions: `chmod 700 {DATA_DIR}`
-- Restrict JWT key permissions: `chmod 600 {DATA_DIR}/jwt-key.pem`
+- Restrict JWT key permissions: `chmod 600 {DATA_DIR}/jwt-private.pem`
 
 ### Authentication
 

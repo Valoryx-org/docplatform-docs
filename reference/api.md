@@ -28,15 +28,15 @@ Obtain tokens via the login or OIDC endpoints.
 
 | Token | Lifetime | Purpose |
 |---|---|---|
-| Access token | 30 minutes | API authentication |
+| Access token | 15 minutes | API authentication |
 | Refresh token | 7 days | Obtain new access tokens (rotated on each use) |
 
 ### API keys
 
-For programmatic access (CI/CD, MCP, scripts), use API keys instead of JWT tokens. API keys use the `dp_` prefix and are scoped to specific workspaces and permissions.
+For programmatic access (CI/CD, MCP, scripts), use API keys instead of JWT tokens. API keys use the `dp_live_` prefix and are scoped to specific workspaces and permissions.
 
 ```
-Authorization: Bearer dp_abc123...
+Authorization: Bearer dp_live_abc123...
 ```
 
 Create API keys from **Workspace Settings** → **API Keys**.
@@ -77,7 +77,7 @@ Create a new user account. The first user becomes SuperAdmin.
   },
   "access_token": "eyJhbG...",
   "refresh_token": "eyJhbG...",
-  "expires_in": 1800
+  "expires_in": 900
 }
 ```
 
@@ -104,7 +104,7 @@ Authenticate with email and password.
 {
   "access_token": "eyJhbG...",
   "refresh_token": "eyJhbG...",
-  "expires_in": 1800
+  "expires_in": 900
 }
 ```
 
@@ -137,7 +137,7 @@ Exchange a refresh token for a new access token. The refresh token is rotated (o
 {
   "access_token": "eyJhbG...",
   "refresh_token": "eyJhbG...",
-  "expires_in": 1800
+  "expires_in": 900
 }
 ```
 
@@ -204,7 +204,7 @@ DELETE /api/auth/webauthn/credentials/:id  — Delete a credential
 POST /api/auth/logout                   — Logout (revoke refresh token)
 GET  /api/auth/me                       — Current user info
 GET  /api/auth/sessions                 — List active sessions
-POST /api/auth/ws-token                 — Get WebSocket ticket
+POST /api/auth/ws-token                 — Set WebSocket auth cookie
 POST /api/auth/invitations/accept       — Accept workspace invitation
 ```
 
@@ -381,7 +381,7 @@ Reorder pages within a tree level. Requires write permission.
 ## Search
 
 ```
-GET /api/v1/search?q={query}
+GET /api/v1/workspaces/:id/search?q={query}
 ```
 
 Full-text search across workspaces the user has access to.
@@ -444,7 +444,7 @@ Manually trigger a git pull + reconciliation. Requires workspace_admin role.
 ### Webhook endpoint
 
 ```
-POST /api/git/webhook
+POST /api/git/webhook/:workspace_id
 ```
 
 A single endpoint that receives push event payloads from GitHub, GitLab, or Bitbucket. The payload format is auto-detected. No authentication header required — payloads are validated using the `GIT_WEBHOOK_SECRET` shared secret (HMAC-SHA256).
@@ -645,63 +645,63 @@ PATCH /api/v1/users/me/onboarding  — Update onboarding state
 
 ## Super admin panel
 
-These endpoints require the `super_admin` role. All prefixed with `/api/admin/`.
+These endpoints require the `super_admin` role. All prefixed with `/api/v1/admin/`.
 
 ### Organization management
 
 ```
-GET  /api/admin/orgs                          — List all organizations
-GET  /api/admin/orgs/:id                      — Get organization details
-PUT  /api/admin/orgs/:id/plan                 — Change organization plan
-POST /api/admin/orgs/:id/subscription/override — Override subscription
-PUT  /api/admin/orgs/:id/rate-limits          — Override rate limits
-POST /api/admin/orgs/:id/export               — Export org data (GDPR)
+GET  /api/v1/admin/orgs                          — List all organizations
+GET  /api/v1/admin/orgs/:id                      — Get organization details
+PUT  /api/v1/admin/orgs/:id/plan                 — Change organization plan
+POST /api/v1/admin/orgs/:id/subscription/override — Override subscription
+PUT  /api/v1/admin/orgs/:id/rate-limits          — Override rate limits
+POST /api/v1/admin/orgs/:id/export               — Export org data (GDPR)
 ```
 
 ### User management
 
 ```
-GET    /api/admin/users              — List all users
-GET    /api/admin/users/:id          — Get user details
-POST   /api/admin/users/:id/impersonate — Impersonate user
-POST   /api/admin/users/:id/export   — Export user data (GDPR)
-DELETE /api/admin/users/:id          — Delete user (GDPR right to erasure)
+GET    /api/v1/admin/users              — List all users
+GET    /api/v1/admin/users/:id          — Get user details
+POST   /api/v1/admin/users/:id/impersonate — Impersonate user
+POST   /api/v1/admin/users/:id/export   — Export user data (GDPR)
+DELETE /api/v1/admin/users/:id          — Delete user (GDPR right to erasure)
 ```
 
 ### Audit log
 
 ```
-GET /api/admin/audit-log    — Query audit log (filterable by user, action, resource, date range)
+GET /api/v1/admin/audit-log    — Query audit log (filterable by user, action, resource, date range)
 ```
 
 ### Billing overview
 
 ```
-GET /api/admin/billing/overview       — Platform-wide billing summary
-GET /api/admin/billing/subscriptions  — All active subscriptions
-GET /api/admin/billing/events         — Webhook event log
+GET /api/v1/admin/billing/overview       — Platform-wide billing summary
+GET /api/v1/admin/billing/subscriptions  — All active subscriptions
+GET /api/v1/admin/billing/events         — Webhook event log
 ```
 
 ### Domain management
 
 ```
-GET    /api/admin/domains              — List all custom domains
-POST   /api/admin/domains/:id/verify   — Verify domain DNS
-POST   /api/admin/domains/:id/provision — Provision TLS certificate
-DELETE /api/admin/domains/:id          — Delete domain
+GET    /api/v1/admin/domains              — List all custom domains
+POST   /api/v1/admin/domains/:id/verify   — Verify domain DNS
+POST   /api/v1/admin/domains/:id/provision — Provision TLS certificate
+DELETE /api/v1/admin/domains/:id          — Delete domain
 ```
 
 ### System health
 
 ```
-GET /api/admin/system/health    — System health metrics (disk, memory, uptime, DB stats)
+GET /api/v1/admin/system/health    — System health metrics (disk, memory, uptime, DB stats)
 ```
 
 ### Platform analytics
 
 ```
-GET /api/admin/analytics/overview  — Platform-wide analytics overview
-GET /api/admin/analytics/growth    — Platform growth metrics
+GET /api/v1/admin/analytics/overview  — Platform-wide analytics overview
+GET /api/v1/admin/analytics/growth    — Platform growth metrics
 ```
 
 ---
@@ -752,10 +752,10 @@ These endpoints use the unversioned `/api/` prefix and do not require authentica
 
 ```
 GET /api/health    → 200 OK { "status": "ok", "db": "ok", "git": "ok" }
-GET /api/readyz    → 200 OK { "status": "ready" }
+GET /api/ready     → 200 OK { "status": "ready" }
 ```
 
-The `/api/readyz` endpoint returns `503 Service Unavailable` while the initial reconciliation is in progress (startup).
+The `/api/ready` endpoint returns `503 Service Unavailable` while the initial reconciliation is in progress (startup).
 
 ---
 
@@ -917,28 +917,25 @@ Removes conflict artifacts after manual resolution.
 
 ## WebSocket
 
-### Obtain a connection ticket
+### Obtain a WebSocket auth cookie
 
 ```
-POST /api/auth/ws-ticket
+POST /api/auth/ws-token
 ```
 
-WebSocket connections use a one-time ticket pattern to avoid exposing JWT tokens in URLs.
+WebSocket connections use an HttpOnly cookie mechanism to avoid exposing tokens in URLs.
 
 **Response:** `200 OK`
 
-```json
-{
-  "ticket": "random-ticket-value",
-  "expires_in": 30
-}
-```
+Sets a `dp_ws_token` HttpOnly cookie (valid for **30 seconds**, single-use). No JSON body is returned.
 
-The ticket is valid for **30 seconds** and can only be used once. Connect via:
+Connect via:
 
 ```
-ws://localhost:3000/ws?ticket={ticket}
+ws://localhost:3000/ws
 ```
+
+The browser sends the `dp_ws_token` cookie automatically. The server validates it, establishes the WebSocket, and clears the cookie.
 
 ### Server events
 
