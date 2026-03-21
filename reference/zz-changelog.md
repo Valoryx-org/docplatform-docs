@@ -174,7 +174,7 @@ Initial public beta. Single binary, zero external dependencies.
 
 ### Authentication & Authorization
 - JWT access + refresh tokens (RS256 RSA-SHA256)
-- Role-based access control: 6 roles (SuperAdmin, WorkspaceAdmin, SpaceAdmin, Editor, Commenter, Viewer)
+- Role-based access control: 5 roles (Super Admin, Admin, Editor, Commenter, Viewer)
 - Local password auth with argon2id hashing (OWASP 2024)
 - Password reset flow (SMTP or stdout token)
 - Google and GitHub OIDC sign-in

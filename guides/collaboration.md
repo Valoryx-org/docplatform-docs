@@ -37,7 +37,7 @@ curl -X POST http://localhost:3000/api/v1/workspaces/{workspace-id}/invitations 
 
 ### Remove members
 
-Workspace Admins can remove members from **Settings** → **Members** → click the user → **Remove**.
+Admins can remove members from **Settings** → **Members** → click the user → **Remove**.
 
 Removing a member revokes their access immediately. Their past edits and audit log entries are preserved.
 
@@ -47,15 +47,14 @@ Click a member's current role to change it. Role changes take effect immediately
 
 ## Roles
 
-DocPlatform uses a 6-level role hierarchy. Higher roles inherit all permissions of lower roles.
+DocPlatform uses a 5-level role hierarchy. Higher roles inherit all permissions of lower roles.
 
 ```
-SuperAdmin
-    └── WorkspaceAdmin
-            └── SpaceAdmin
-                  └── Editor
-                        └── Commenter
-                              └── Viewer
+Super Admin
+    └── Admin
+            └── Editor
+                  └── Commenter
+                        └── Viewer
 ```
 
 | Role | Scope | Capabilities |
@@ -63,9 +62,8 @@ SuperAdmin
 | **Viewer** | Workspace | View pages and search |
 | **Commenter** | Workspace | View + leave comments on pages |
 | **Editor** | Workspace | View + comment + create, edit, delete pages |
-| **SpaceAdmin** | Path-scoped | Editor + manage pages under assigned path patterns |
-| **WorkspaceAdmin** | Workspace | Full workspace management (settings, git, theme, members) |
-| **SuperAdmin** | Platform | Full access to all workspaces + platform settings |
+| **Admin** | Workspace | Full workspace management (settings, git, theme, members) |
+| **Super Admin** | Platform | Full access to all workspaces + platform settings |
 
 ### Default role for new members
 
@@ -85,7 +83,7 @@ Restrict individual pages to specific roles using frontmatter access rules:
 ---
 title: Internal Runbook
 access:
-  read: ["sre-team", "workspace_admin"]
+  read: ["sre-team", "admin"]
   write: ["sre-team"]
 ---
 ```

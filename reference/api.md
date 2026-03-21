@@ -108,7 +108,7 @@ Auth endpoints use the unversioned `/api/auth/` prefix.
 POST /api/auth/register
 ```
 
-Create a new user account. The first user becomes SuperAdmin.
+Create a new user account. The first user becomes Super Admin.
 
 **Request:**
 
@@ -407,7 +407,7 @@ Returns workspaces the current user is a member of.
 POST /api/v1/workspaces
 ```
 
-Requires SuperAdmin role.
+Requires Super Admin role.
 
 **Request:**
 
@@ -515,7 +515,7 @@ Results are permission-filtered — users only see pages they have access to.
 POST /api/v1/workspaces/{workspace_id}/sync
 ```
 
-Manually trigger a git pull + reconciliation. Requires workspace_admin role.
+Manually trigger a git pull + reconciliation. Requires Admin role.
 
 **Response:** `200 OK`
 
@@ -734,7 +734,7 @@ PATCH /api/v1/users/me/onboarding  — Update onboarding state
 
 ## Super admin panel
 
-These endpoints require the `super_admin` role. All prefixed with `/api/v1/admin/`.
+These endpoints require the Super Admin role. All prefixed with `/api/v1/admin/`.
 
 ### Organization management
 
@@ -831,7 +831,7 @@ All tools respect workspace permissions and require a valid API key. See the [AI
 GET /metrics
 ```
 
-Available when `FF_METRICS=true`. Requires super admin authentication. Exposes HTTP latency histograms, request counts, auth event counters, and more.
+Available when `FF_METRICS=true`. Requires Super Admin authentication. Exposes HTTP latency histograms, request counts, auth event counters, and more.
 
 ---
 
