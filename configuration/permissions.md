@@ -218,17 +218,17 @@ For the **published docs site** (`/p/{slug}/...`), access control works differen
 
 For reference, each role maps to a numeric level. Higher levels inherit all permissions of lower levels:
 
-| Role | Level | Minimum action |
-|---|---|---|
-| Viewer | 10 | `read` |
-| Commenter | 20 | `read` |
-| Editor | 30 | `read`, `write` (+ `create`/`delete` if enabled) |
-| Admin | 40 | All workspace actions |
-| Super Admin | 50 | All platform actions (bypasses all checks) |
+| Role | Level | Scope | Minimum action |
+|---|---|---|---|
+| Viewer | 10 | Workspace | `read` |
+| Commenter | 20 | Workspace | `read`, `comment` |
+| Editor | 30 | Workspace | `read`, `comment`, `edit` (+ `create`/`delete` if enabled) |
+| Admin | 40 | Workspace | All workspace actions |
+| Super Admin | — | Org | Bypasses all workspace checks |
 
-> The internal code uses `workspace_admin` for Admin and `super_admin` for Super Admin. These are implementation details — the public-facing names are Admin and Super Admin.
+> The internal code uses `workspace_admin` for Admin and `super_admin` for Super Admin. Super Admin is an **org-level role** (not a workspace role with a numeric level) — it bypasses workspace permission checks entirely. Platform Owner is a boolean flag on the user record that bypasses all checks globally.
 
-Actions have minimum levels: `read` requires level 10+, `write` requires 30+, `delete` requires 30+ (and `editor_can_delete_pages` enabled for Editors), `admin` requires 40+. A user's role level is compared against the action's minimum level.
+Actions have minimum levels: `read` requires level 10+, `comment` requires 20+, `edit` requires 30+, `write`/`delete` requires 40+ (Editors get `edit` but not `write`/`delete` unless configurable flags are enabled), `admin` requires 40+. A user's role level is compared against the action's minimum level.
 
 ## How permissions are evaluated
 
@@ -250,11 +250,11 @@ Permission Middleware
 
 ### 5-step evaluation flow
 
-1. **Is workspace public + action is read?** → assign anonymous viewer role
-2. **Is user Super Admin?** → ALLOW (bypasses all checks)
-3. **Is user Admin for this workspace?** → ALLOW for this workspace
-4. **Does user's role permit action?** → custom RBAC check with `keyMatch2(path)`, plus editor permission flags
-5. **Does page frontmatter have access rules?** → check whitelist, RESTRICT within role
+1. **Is user Platform Owner?** → ALLOW (global bypass)
+2. **Is user Org Super Admin for this workspace's org?** → ALLOW (org-level bypass)
+3. **Look up user's workspace role** → if not a workspace member, DENY
+4. **Does user's role level meet the action's minimum level?** → compare `role_level >= action_min_level`, plus editor permission flags
+5. **Does page frontmatter have access rules?** → check `access.roles`/`access.users`, RESTRICT within role
 
 Frontmatter RESTRICTS within role, never GRANTS beyond it. A malformed frontmatter defaults to **strict mode** — page restricted to Admin only.
 
