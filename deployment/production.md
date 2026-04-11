@@ -64,12 +64,12 @@ Community Edition includes the following hardcoded limits:
 
 | Resource | Limit |
 |---|---|
-| Users with Editor role or above | 5 |
-| Workspaces | 3 |
+| Users with Editor role or above | Unlimited |
+| Workspaces | Unlimited |
 | Viewers and Commenters | Unlimited |
 | Pages per workspace | Unlimited |
 
-These limits are checked on editor role assignment and workspace creation. If you need more editors or workspaces, the future Enterprise Edition will offer configurable limits via license key.
+Community Edition is fully unlimited — no artificial caps on editors, workspaces, or pages.
 
 ## Scaling considerations
 

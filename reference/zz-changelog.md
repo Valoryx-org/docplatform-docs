@@ -18,12 +18,13 @@ Phase 1 complete — major feature expansion across billing, analytics, authenti
 
 #### Billing & Licensing (Stripe)
 - Stripe Checkout + Customer Portal integration
-- 3 plan tiers: Community (free), Team ($99/mo), Business ($299/mo)
-- Annual pricing with 2 months free ($990/yr, $2,990/yr)
+- 4 plan tiers: Community (free, unlimited), Free (1 workspace, 3 editors, 50 pages), Team ($29/mo), Business ($79/mo, Coming Soon)
+- Annual pricing with 2 months free ($290/yr, $790/yr)
 - 14-day free trial for paid plans (configurable via `TRIAL_DURATION_DAYS`)
 - Feature gating: analytics, custom domains, advanced AI locked to paid plans
-- Editor limits enforced per plan (Community: 5, Team: 10, Business: 50)
-- Workspace limits enforced per plan (Community: 3, Team/Business: unlimited)
+- Editor limits enforced per plan (Community: unlimited, Free: 3, Team: 15, Business: 50)
+- Workspace limits enforced per plan (Community: unlimited, Free: 1, Team: 3, Business: 10)
+- Page limits enforced per plan (Community: unlimited, Free: 50, Team: 150, Business: unlimited)
 - Stripe webhook handler with idempotent event processing
 - Subscription lifecycle: trial → active → grace → restricted → canceled
 - Plan definitions seeded in database on first run
