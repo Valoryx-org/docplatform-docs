@@ -10,121 +10,140 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.2] — 2026-03-07
+## [0.6.4] — 2026-04-08
 
-Phase 1 complete — major feature expansion across billing, analytics, authentication, AI, publishing, and platform operations.
+### Security
+- **Published docs auth bypass fixed** — `c.Redirect()` in Fiber returns nil, causing handler to render page after redirect. Pages with `visibility=authenticated` were served without auth.
+- **Path validation hardened** — reject dangerous file extensions (.php, .exe), block system directory names (etc/, var/, bin/), enforce 200-char path limit. Paths without extension auto-normalized to .md.
+- **Registration email enumeration prevented** — generic error message replaces "email already registered" (OWASP compliance).
+- **DeleteMembersByUserID scoped to org** — was deleting workspace memberships across ALL orgs when archiving from one.
+- **OIDC state comparison** uses `crypto/subtle.ConstantTimeCompare` instead of `!=`.
+- **DeleteUser confirmation** requires exact `{"confirm":"DELETE"}` — empty body no longer bypasses.
+- **Max password length** capped at 1024 characters to prevent Argon2id resource exhaustion.
+- **DEV_FRONTEND_URL blocked in production** — fails startup if set when `DOCPLATFORM_ENV=production`.
+- **HSTS only emitted when TLS active** on MCP HTTP endpoint.
 
 ### Added
+- **`reset-password` CLI command** — generate password reset links for community deployments without SMTP: `docplatform reset-password --email user@example.com`.
+- **Update notification system** — admin dashboard shows banner when new version is available. `GET /api/v1/admin/system/update-check` endpoint.
+- **Move/Rename via POST** — `POST /content/:ws/move` with `{source, destination}` matches frontend API contract.
 
-#### Billing & Licensing (Stripe)
-- Stripe Checkout + Customer Portal integration
-- 4 plan tiers: Community (free, unlimited), Free (1 workspace, 3 editors, 50 pages), Team ($29/mo), Business ($79/mo, Coming Soon)
-- Annual pricing with 2 months free ($290/yr, $790/yr)
-- 14-day free trial for paid plans (configurable via `TRIAL_DURATION_DAYS`)
-- Feature gating: analytics, custom domains, advanced AI locked to paid plans
-- Editor limits enforced per plan (Community: unlimited, Free: 3, Team: 15, Business: 50)
-- Workspace limits enforced per plan (Community: unlimited, Free: 1, Team: 3, Business: 10)
-- Page limits enforced per plan (Community: unlimited, Free: 50, Team: 150, Business: unlimited)
-- Stripe webhook handler with idempotent event processing
-- Subscription lifecycle: trial → active → grace → restricted → canceled
-- Plan definitions seeded in database on first run
-
-#### Analytics (GDPR-Compliant)
-- Pageview tracking (path, referrer, truncated UA — no IP storage)
-- Search analytics (query frequency, top searches)
-- Top pages aggregation with configurable time period
-- Dashboard overview: total views, searches, unique pages
-- Cookie-based opt-in consent with `POST /api/analytics/consent`
-- Separate `analytics.db` SQLite database (isolates from main DB)
-- 90-day retention with automatic pruning
-- Platform-wide analytics for super admins
-
-#### WebAuthn / Passkeys
-- Passwordless authentication with hardware security keys and biometrics
-- Registration and login flows: `POST /api/auth/webauthn/register/begin|finish`, `POST /api/auth/webauthn/login/begin|finish`
-- Credential management: list stored credentials, delete individual credentials
-- Clone detection via sign count tracking
-- Configurable via `WEBAUTHN_RP_ID`, `WEBAUTHN_RP_DISPLAY_NAME`, `WEBAUTHN_RP_ORIGINS`
-
-#### AI Writing Assist
-- Writing operations: rewrite, improve, shorten, expand
-- Doc Chat: multi-turn conversation about workspace documentation
-- Provider support: Claude (Anthropic) and OpenAI
-- Configurable model via `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`
-- Status endpoint: `GET /api/v1/ai/status`
-
-#### Doc Quality Scanner
-- Readability scoring (Flesch-Kincaid grade level)
-- Dead link detection (broken internal markdown links)
-- Completeness check (missing frontmatter, orphan pages)
-- Workspace-level aggregate quality report: `GET /api/v1/workspaces/:id/quality`
-
-#### Publishing Enhancements
-- 7 built-in themes: Default, Dark, Forest, Rose, Amber, Minimal, Corporate
-- Auto-generated RSS feed at `/p/{slug}/rss.xml`
-- Static HTML ZIP export via CLI (`docplatform export`) and API (`GET /api/v1/workspaces/:id/export`)
-- Local preview server: `docplatform preview --workspace <slug> --port 4000`
-- Custom domains with auto-TLS via Caddy integration
-- Domain management API for workspace admins and super admins
-
-#### Doc Versioning
-- Named documentation versions (e.g., v1, v2) within a workspace
-- Default version selection
-- CRUD endpoints: `GET|POST|PUT|DELETE /api/v1/workspaces/:id/versions`
-
-#### Super Admin Dashboard
-- Organization management: list, view details, change plans, override subscriptions
-- User management: list, search, view details, impersonate, delete (GDPR)
-- Append-only audit log with filterable query endpoint
-- System health: disk usage, memory, uptime, DB stats
-- Billing dashboard: platform-wide subscriptions, webhook event log
-- Rate limit overrides per organization
-- Domain management: list, verify DNS, provision TLS, delete
-- GDPR compliance: export org/user data, anonymize records
-
-#### API Keys
-- Org-level programmatic access with `dp_live_` prefix
-- HMAC hashing with configurable pepper (`API_KEY_PEPPER`)
-- Create, list (prefix only), delete, rotate endpoints
-- Scoped authentication for CI/CD and MCP integrations
-
-#### MCP Server
-- `docplatform mcp` CLI command for Model Context Protocol integration
-- Stdio-based server compatible with Claude Code, Claude Desktop
-- Scoped to single workspace, authenticated via API key
-
-#### Durable Job Queue
-- DB-backed async job worker with 500ms polling interval
-- Handler registry: `search_reindex`, `manifest_rebuild`, `asset_cleanup`
-- Max 3 retry attempts with exponential backoff
-- Dead-letter on exhaustion, `ListPending` for retry orchestration
-- Graceful shutdown drains in-flight jobs
-
-#### Per-Path Mutex with TTL/LRU
-- Background GC goroutine every 60s evicts entries idle >5 minutes
-- LRU eviction of oldest 25% when hard cap (10,000 entries) exceeded
-- `mutexEntry` struct with atomic last-access timestamp
-
-#### Testing
-- Property-based tests using `pgregory.net/rapid` (6 tests: create/read consistency, no duplicate IDs, update preserves ID, delete removes FS, frontmatter roundtrip, reconcile consistency)
-- Chaos test harness (6 scenarios: FS write before DB commit, DB commit before search index, partial reconciliation, concurrent writes, FS-only delete, job queue recovery)
+### Fixed
+- **Duplicate workspace slug** returns 409 Conflict instead of 500 Internal Server Error.
+- **Plan limits enforced on direct member assignment** — `CanAddEditor` now checked in `AssignMemberToWorkspace`, not just invitation flow.
+- **Git sync popup dismissable** — close button and "Later" now work (animation-based dismiss replaced with direct removal).
+- **Workspace creation transactional** — workspace + member + published site wrapped in `WithTx` to prevent orphaned records.
+- **Email Sender thread-safe** — added `sync.RWMutex` for concurrent `Configure`/`SetResend` vs send operations.
+- **Publish render cache bounded** — sync.Map capped at 10k entries to prevent unbounded memory growth.
+- **LLMs-full.txt capped** at 200 pages to prevent resource exhaustion on public endpoints.
+- **Missing `rows.Err()` check** in `ListRecentlyDeleted` — partial results from I/O errors now detected.
+- **Filename overflow** in editor header — long titles/paths truncated with ellipsis.
+- **Billing error messages sanitized** — Stripe internal details no longer leaked to client.
 
 ### Changed
-- Resend email provider support alongside SMTP (`RESEND_API_KEY`, `RESEND_FROM`)
-- Git SSH known_hosts configuration via `GIT_SSH_KNOWN_HOSTS` (built-in pinned keys for GitHub/GitLab/Bitbucket when unset)
-- Storage info visibility controls: `HIDE_STORAGE_PATHS`, `SHOW_DISK_PATHS_TO_WS_ADMIN`
-- Prometheus metrics endpoint (`/metrics`) gated behind `FF_METRICS=true`
-- Development proxy via `DEV_FRONTEND_URL` for frontend HMR
+- **Version wiring** — `main.version` (set by GoReleaser) now flows to health endpoint via `handlers.SetVersion()`.
+- **GoReleaser** — removed `-s -w` strip ldflags that caused SEGV on some platforms.
+- **valoryx.org** — "Join Waitlist" → "Get in Touch" (6 languages), pricing cards show "Best for" personas.
+
+## [1.0.0] — 2026-03-04 (Phase 1)
+
+Full commercial release with billing, MCP, custom domains, and admin panel.
+
+### Security
+- RS256 JWT (auto-generated RSA key pair, access + refresh tokens, JWKS-ready)
+- Argon2id password hashing (configurable memory/time/threads, OWASP defaults)
+- 3-tier Content Security Policy (SPA with per-request nonce, Published with nonce, API with default-src 'none')
+- OWASP security headers (X-Content-Type-Options, X-Frame-Options, HSTS, Referrer-Policy, Permissions-Policy, COOP)
+- HttpOnly cookie-based OIDC token passing (eliminates localStorage token injection)
+- API key authentication with dp_live_ prefix, HMAC pepper, method+action scope enforcement
+- Per-org rate limiting (7 categories, token bucket algorithm, per-plan limits with admin overrides)
+- Security build pipeline: govulncheck, gosec, SBOM (CycloneDX), garble obfuscation
+- 16 security findings identified and fixed in post-sprint audit
+
+### Billing & Licensing
+- Stripe integration: checkout sessions, customer portal, webhook processing
+- Plan management: community (free), team, business with automatic enforcement
+- Grace period handling: active → grace → restricted state machine
+- Seat limits (editors per org) and workspace caps per plan
+- Feature gates: published_docs, custom_domains, analytics per plan
+- Admin subscription overrides with audit trail
+
+### Custom Domains
+- CNAME-based custom domain verification per workspace
+- Caddy reverse proxy integration with automatic TLS provisioning
+- Ask endpoint for on-demand certificate validation
+- Host-based routing for published documentation sites
+
+### MCP Server
+- 13 tools accessible via stdio transport for Claude Desktop
+- API key authentication with scope enforcement
+- Context bundle assembly (get_context tool)
+
+### Analytics
+- Separate analytics.db (SQLite, no FK constraints, independent lifecycle)
+- Buffered event collector with async batch inserts
+- Pageview and search event tracking with GDPR consent gating
+- 90-day retention policy with automatic cleanup
+- Dashboard queries: top pages, top searches, platform overview, growth metrics
+- Race-condition-free collector with sync.WaitGroup synchronization
+
+### Admin Panel
+- Super admin guard middleware with JWT-based role check
+- Organization management: list, view, plan updates, rate limit overrides
+- User management: list, search, view details
+- Audit log viewer with pagination
+- Billing dashboard: MRR overview, subscription list with status filters, webhook events
+- Domain management: list, verify, provision, delete
+- Platform analytics: overview stats, growth metrics
+- System health: database, search, analytics status indicators
+- GDPR compliance: org data export, user data export, user deletion with audit anonymization
+- Impersonation support for debugging
+
+### Observability
+- Prometheus metrics endpoint (super admin protected)
+- Telemetry collection with opt-in controls
+- Doctor bundle with system diagnostics
+
+### Frontend
+- Onboarding checklist with progress tracking (5 steps, dismissible, auto-dismiss on completion)
+- Settings tabs: Custom Domains, API Keys, Billing, Analytics
+- Admin panel: 7 tabs (Organizations, Users, Audit, Billing, Domains, Analytics, System Health)
+- Conflict resolver modal: keep local / use server version
+- Move/rename dialog with path validation, auto-redirect, and wikilink update
+- Valoryx branding: Plus Jakarta Sans headings, DM Sans body, JetBrains Mono code
+- Brand colors: #124265 (heading), #1d7fc2 (accent), #0c1e2e (navy)
+
+### Published Docs
+- 5 theme presets: default, dark, forest, rose, amber
+- 6 editor components: code blocks, callouts, tabs, diagrams, badges, copy button
+- SEO: sitemap.xml, robots.txt, RSS feed, JSON-LD structured data, Open Graph, Twitter Cards
+- Community Edition badge
+
+### Content Management
+- Wikilink scanner with async repair
+- Page rename/move with redirect creation, path mutex, wikilink updates
+- Conflict resolver backend with timestamp-based versioning
+- Onboarding state machine with auto-org creation and starter workspace
+- OpenAPI 3.0 specification with Scalar UI at /api/docs
 
 ### Infrastructure
-- 95+ REST API endpoints (up from ~40 in v0.5.1)
-- 8 CLI commands (added: `export`, `preview`, `mcp`)
-- Comprehensive OpenAPI 3.1.0 specification
+- Analytics database separation (no FK constraints, independent backup/retention)
+- Email improvements: Resend integration, HTML templates, password reset
+- Pre-commit hooks: gofumpt + go vet
+
+### Metrics
+- 106 source files, 20,904 LOC
+- 61 test files, 13,301 test LOC
+- 709 tests across 21 packages, 0 failures
+- go vet clean, go test -race clean
+- govulncheck: 0 vulnerabilities
+
+---
 
 ## [0.5.1] — 2026-03-02
 
 ### Security
-- Complete security audit remediation (Phases 1-5): input validation, rate limiting, CSRF protection, secure headers
+- Complete security audit remediation (Phases 1–5): input validation, rate limiting, CSRF protection, secure headers
 - Update vulnerable dependencies (go-git, golang.org/x/crypto, bluemonday, and others)
 - Switch Windows binary signing from SignPath to Azure Trusted Signing
 
@@ -136,7 +155,7 @@ Phase 1 complete — major feature expansion across billing, analytics, authenti
 - Workspace role display and editor permission checks
 - All errcheck lint violations resolved across 47+ files (proper error handling for Close, Rollback, Write, rows.Close, etc.)
 - Dead code removed: stub repositories (108 lines), unused handler function
-- Race condition fixes in tests; auth test timeouts increased under `-race`
+- Race condition fixes in tests; auth test timeouts increased for bcrypt under `-race`
 - staticcheck, ineffassign, and unused lint findings resolved
 
 ### Added
@@ -165,7 +184,7 @@ Initial public beta. Single binary, zero external dependencies.
 - Content Ledger with per-path mutex locking and ULID-based page IDs
 - SQLite storage via modernc.org/sqlite (pure Go, no CGO)
 - Markdown rendering with goldmark (syntax highlighting, frontmatter parsing)
-- Full-text search with embedded Bleve engine (pure Go, on-disk index)
+- Full-text search ready schema with FTS5
 
 ### Git Integration
 - Bidirectional git sync (push + pull) with conflict detection
@@ -174,11 +193,10 @@ Initial public beta. Single binary, zero external dependencies.
 - SSH deploy key and HTTPS authentication support
 
 ### Authentication & Authorization
-- JWT access + refresh tokens (RS256 RSA-SHA256)
-- Role-based access control: 5 roles (Super Admin, Admin, Editor, Commenter, Viewer)
-- Local password auth with argon2id hashing (OWASP 2024)
+- JWT access + refresh tokens (HMAC-SHA256)
+- Role-based access control: owner, admin, editor, viewer
+- Local password auth with bcrypt hashing
 - Password reset flow (SMTP or stdout token)
-- Google and GitHub OIDC sign-in
 
 ### Publishing
 - Public docs at `/p/:workspace-slug/:page-path`
@@ -200,6 +218,6 @@ Initial public beta. Single binary, zero external dependencies.
 
 ### Infrastructure
 - Multi-stage Docker image (Alpine 3.20, non-root, healthcheck)
-- CI pipeline: lint + test + build (Go 1.25)
+- CI pipeline: lint + test + build (Go 1.24)
 - Tag-triggered release to GitHub Releases + GHCR
-- 300+ tests across 25 packages
+- 233 tests across 13 packages
