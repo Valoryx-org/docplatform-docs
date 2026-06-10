@@ -32,10 +32,9 @@ docplatform serve [flags]
 
 ### Behavior
 
-- Loads environment variables from `.env` file (if present)
+- Reads configuration from environment variables (there is no config file)
 - Initializes SQLite database with WAL mode
 - Runs pending database migrations
-- Loads custom RBAC permission policies into memory
 - Builds or opens the Bleve search index
 - Starts the git sync engine for all configured workspaces
 - Starts the backup scheduler (if enabled)
@@ -45,12 +44,11 @@ docplatform serve [flags]
 
 When `docplatform serve` runs, the following happens in order:
 
-1. Load config (environment variables + `.env` file + defaults)
+1. Load config from environment variables (+ defaults)
 2. Open SQLite database (WAL mode) and run pending migrations
-3. Seed default organization if this is a first run
-4. Initialize services: Content Ledger, Git Engine (worker pool of 4), Search Engine, Permission Service, Auth Service (RS256 JWT, Argon2id, WebAuthn), WebSocket Hub, Billing/License Service (Stripe), Analytics Collector, AI Service
-5. Start background goroutines: WebSocket hub, git sync polling, backup scheduler, durable job worker, analytics collector, telemetry (if enabled)
-6. Begin listening on the configured host:port
+3. Initialize services: Content Ledger, Git Engine, Search Engine, Permission Service, Auth Service (RS256 JWT, Argon2id, WebAuthn), WebSocket Hub, License Service, Analytics Collector, AI Service (if configured)
+4. Start background goroutines: WebSocket hub, git sync polling, backup scheduler, job worker, analytics collector, telemetry (if enabled)
+5. Begin listening on the configured port
 
 Read requests are served immediately. If workspaces have existing content, reconciliation runs in the background without blocking.
 
@@ -86,7 +84,7 @@ docplatform serve --port 8080
 ### Output
 
 ```
-INFO  Server starting            port=3000 version=v0.5.2
+INFO  Server starting            port=3000 version=v0.10.0
 INFO  Database initialized       path=.docplatform/data.db wal=true
 INFO  Migrations applied         count=1
 INFO  Search index ready         documents=42
@@ -113,7 +111,10 @@ docplatform init [flags]
 | `--slug` | Yes | — | URL-safe identifier (used in published docs URL) |
 | `--git-url` | No | — | Remote git repository URL (SSH or HTTPS) |
 | `--branch` | No | `main` | Git branch to sync |
-| `--data-dir` | No | `.docplatform` | Data directory path |
+
+The data directory comes from the `DATA_DIR` environment variable (default `.docplatform`) — this applies to every command; there is no `--data-dir` flag.
+
+> CLI-created workspaces attach to a server-level default organization, not to a web account's organization. See [Your First Workspace](../getting-started/first-workspace.md).
 
 ### Behavior
 
@@ -167,19 +168,16 @@ docplatform rebuild [flags]
 
 | Flag | Required | Default | Description |
 |---|---|---|---|
-| `--workspace` | Yes | — | ULID of the workspace to rebuild (required). |
-| `--search` | No | `false` | Also drop and rebuild the Bleve search index |
-| `--data-dir` | No | `.docplatform` | Data directory path |
+| `--workspace`, `-w` | Yes | — | ULID of the workspace to rebuild (required). |
+| `--search` | No | `false` | Also rebuild the Bleve search index |
 
 ### Behavior
 
-1. Creates a backup of the current database
-2. Drops the `pages` table
-3. Scans the filesystem for all `.md` files in workspace `docs/` directories
-4. Parses frontmatter and content for each file
-5. Inserts page records into the database
-6. Rebuilds the Bleve search index
-7. Reports reconciliation results
+1. Scans the filesystem for all `.md` files in the workspace directory
+2. Parses frontmatter and content for each file
+3. Reconciles page records in the database (three-tier matching: frontmatter ID → path → content hash)
+4. Rebuilds the search index when `--search` is passed
+5. Reports reconciliation results
 
 ### When to use
 
@@ -198,13 +196,10 @@ docplatform rebuild --workspace 01KJJ10NTF31Z1QJTG4ZRQZ2Z2
 ### Output
 
 ```
-INFO  Backup created             path=.docplatform/backups/pre-rebuild-20250115.db
 INFO  Rebuilding workspace       id=01KJJ10NTF... name="API Docs"
-INFO  Scanning filesystem        path=.docplatform/workspaces/01KJJ.../docs/
 INFO  Pages found                count=42
-INFO  Database rebuilt            inserted=42 updated=0 orphaned=3
-INFO  Search index rebuilt        documents=42
-INFO  Ghost recovery             matched=2 unmatched=1
+INFO  Database rebuilt           inserted=42 updated=0 orphaned=3
+INFO  Search index rebuilt       documents=42
 INFO  Rebuild complete
 ```
 
@@ -214,7 +209,7 @@ INFO  Rebuild complete
 
 ## `docplatform doctor`
 
-Run 9 diagnostic checks on the platform health.
+Run 11 diagnostic checks on the platform health.
 
 ```bash
 docplatform doctor [flags]
@@ -225,21 +220,22 @@ docplatform doctor [flags]
 | Flag | Required | Default | Description |
 |---|---|---|---|
 | `--bundle` | No | `false` | Create a ZIP file containing diagnostic output for support |
-| `--data-dir` | No | `.docplatform` | Data directory path |
 
 ### Checks
 
 | # | Check | Description |
 |---|---|---|
-| 1 | **Database connection** | SQLite file exists, is readable, WAL mode enabled |
-| 2 | **Schema version** | Migrations are up to date |
-| 3 | **FS/DB consistency** | Every file in `docs/` has a database record, and vice versa |
-| 4 | **Orphaned files** | Files on disk without a database record |
-| 5 | **Orphaned records** | Database records without a file on disk |
-| 6 | **Search index health** | Bleve index document count matches page count |
-| 7 | **Broken internal links** | Markdown links pointing to non-existent pages |
-| 8 | **Frontmatter validity** | All pages have valid YAML frontmatter with a title |
-| 9 | **Git remote connectivity** | If git is configured, can the remote be reached? |
+| 1 | **config** | Configuration loads and validates |
+| 2 | **data_dir** | The data directory exists and is a directory |
+| 3 | **database** | Main database reachable, migrations current |
+| 4 | **analytics_db** | Analytics database reachable |
+| 5 | **git** | Native `git` binary available in PATH (warning if missing) |
+| 6 | **workspace_dirs** | Every workspace has its content directory on disk |
+| 7 | **orphaned_dirs** | Directories on disk without a workspace record |
+| 8 | **sync_state** | Git sync state is consistent |
+| 9 | **fs_db_consistency** | Files on disk match database page records |
+| 10 | **broken_wikilinks** | Wikilinks pointing to non-existent pages |
+| 11 | **backups** | Backup directory present and recent backups exist |
 
 ### Exit codes
 
@@ -266,38 +262,28 @@ docplatform doctor
 DocPlatform Health Check
 ========================
 
-✓ Database connection          OK (WAL mode, 42 pages, 3 users)
-✓ Schema version               OK (v1, up to date)
-✓ FS/DB consistency            OK (42 files, 42 records)
-✓ Orphaned files               OK (0 found)
-✓ Orphaned records             OK (0 found)
-✓ Search index health          OK (42 indexed, 42 expected)
-⚠ Broken internal links        WARNING (2 broken links found)
-  → guides/editor.md:15 → "old-page.md" (file not found)
-  → api/endpoints.md:42 → "deprecated.md" (file not found)
-✓ Frontmatter validity         OK (42/42 valid)
-✓ Git remote connectivity      OK (git@github.com:your-org/docs.git)
+✓ config                OK
+✓ data_dir              OK (.docplatform exists)
+✓ database              OK (migrations current)
+✓ analytics_db          OK
+✓ git                   OK (binary found)
+✓ workspace_dirs        OK
+✓ orphaned_dirs         OK (0 found)
+✓ sync_state            OK
+✓ fs_db_consistency     OK (42 files, 42 records)
+⚠ broken_wikilinks      WARNING (2 broken links found)
+✓ backups               OK
 
-Result: 8/9 passed, 1 warning
+Result: 10/11 passed, 1 warning
 ```
 
 ### Bundle mode
 
 ```bash
 docplatform doctor --bundle
-# Creates: docplatform-doctor-20250115.zip
 ```
 
-The bundle is saved to `{DATA_DIR}/diagnostics/docplatform-diagnostics-{timestamp}.zip` and contains:
-
-- `report.json` — structured diagnostic results
-- Schema information (table definitions, no row data)
-- File listing (paths and sizes, no content)
-- System info (OS, architecture, Go version)
-- Last 1,000 lines of error logs
-- Server version and configuration (with secrets redacted)
-
-The bundle **never** includes page content, passwords, tokens, or private keys.
+The bundle is saved to `{DATA_DIR}/diagnostics-{timestamp}.zip` and contains sanitized system information and the structured check results for support requests. It never includes page content, passwords, tokens, or private keys.
 
 ---
 
@@ -313,9 +299,8 @@ docplatform export [flags]
 
 | Flag | Required | Default | Description |
 |---|---|---|---|
-| `--workspace` | Yes | — | Workspace ID (ULID) to export |
-| `--output` | No | `{workspace}-export.zip` | Output ZIP file path |
-| `--data-dir` | No | `.docplatform` | Data directory path |
+| `--workspace`, `-w` | Yes | — | Workspace ID (ULID) to export |
+| `--output`, `-o` | No | `{site-slug}-export.zip` | Output ZIP file path |
 
 ### Behavior
 
@@ -327,7 +312,7 @@ docplatform export [flags]
 ### Example
 
 ```bash
-docplatform export --workspace my-docs --output ./dist/my-docs.zip
+docplatform export --workspace 01KJJ10NTF31Z1QJTG4ZRQZ2Z2 --output ./dist/my-docs.zip
 ```
 
 The resulting ZIP can be deployed to any static file host (Netlify, Vercel, S3, GitHub Pages, Cloudflare Pages).
@@ -346,9 +331,8 @@ docplatform preview [flags]
 
 | Flag | Required | Default | Description |
 |---|---|---|---|
-| `--workspace` | Yes | — | Workspace ID (ULID) to preview |
-| `--port` | No | `4000` | HTTP listen port |
-| `--data-dir` | No | `.docplatform` | Data directory path |
+| `--workspace`, `-w` | Yes | — | Workspace ID (ULID) to preview |
+| `--port`, `-p` | No | `4000` | HTTP listen port |
 
 ### Behavior
 
@@ -378,11 +362,10 @@ docplatform mcp [flags]
 |---|---|---|---|
 | `--workspace`, `-w` | Yes | — | Workspace slug to expose |
 | `--api-key` | Yes | — | API key for authentication (`dp_live_...`). Also accepts `DOCPLATFORM_API_KEY` env var |
-| `--data-dir` | No | `.docplatform` | Data directory path |
 
 ### Behavior
 
-Starts an MCP server on stdin/stdout, scoped to a single workspace and authenticated via API key. Exposes 24 tools for content CRUD, search, quality scanning, versioning, export, and more. Compatible with any MCP client (Claude Desktop, Claude Code, Cursor, VS Code).
+Starts an MCP server on stdin/stdout, scoped to a single workspace and authenticated via API key. Exposes 26 tools for content CRUD, search, quality scanning, versioning, export, and more. Compatible with any MCP client (Claude Desktop, Claude Code, Cursor, VS Code).
 
 ### Example
 
@@ -421,7 +404,6 @@ docplatform mcp-server [flags]
 |---|---|---|---|
 | `--addr` | No | `:8081` | Listen address (e.g., `:8081`, `0.0.0.0:9090`) |
 | `--cors-origins` | No | claude.ai, cursor | Allowed CORS origins (comma-separated) |
-| `--data-dir` | No | `.docplatform` | Data directory path |
 
 ### Behavior
 
@@ -446,6 +428,25 @@ Authorization: Bearer dp_live_abc123
 
 ---
 
+## `docplatform reset-password`
+
+Generate a one-time password-reset link for a user — useful when email isn't configured or a user is locked out.
+
+```bash
+docplatform reset-password --email user@example.com
+```
+
+### Flags
+
+| Flag | Required | Default | Description |
+|---|---|---|---|
+| `--email` | Yes | — | Email address of the user |
+| `--base-url` | No | `BASE_URL` env or `http://localhost:3000` | Base URL used to build the reset link |
+
+The printed link is single-use and expires after 1 hour.
+
+---
+
 ## `docplatform version`
 
 Print version, commit hash, and build date.
@@ -457,7 +458,7 @@ docplatform version
 ### Output
 
 ```
-docplatform v0.5.2 (commit: abc1234, built: 2026-03-08T10:00:00Z)
+docplatform v0.10.0 (commit: 5738520, built: 2026-05-16T17:52:38Z)
 ```
 
 The version information is embedded at build time via linker flags. Useful for verifying which release is deployed and for support requests.
