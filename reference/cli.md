@@ -209,7 +209,7 @@ INFO  Rebuild complete
 
 ## `docplatform doctor`
 
-Run 11 diagnostic checks on the platform health.
+Run 10 diagnostic checks on the platform health.
 
 ```bash
 docplatform doctor [flags]
@@ -231,11 +231,10 @@ docplatform doctor [flags]
 | 4 | **analytics_db** | Analytics database reachable |
 | 5 | **git** | Native `git` binary available in PATH (warning if missing) |
 | 6 | **workspace_dirs** | Every workspace has its content directory on disk |
-| 7 | **orphaned_dirs** | Directories on disk without a workspace record |
-| 8 | **sync_state** | Git sync state is consistent |
-| 9 | **fs_db_consistency** | Files on disk match database page records |
-| 10 | **broken_wikilinks** | Wikilinks pointing to non-existent pages |
-| 11 | **backups** | Backup directory present and recent backups exist |
+| 7 | **sync_state** | Git sync state is consistent |
+| 8 | **fs_db_consistency** | Files on disk match database page records |
+| 9 | **broken_wikilinks** | Wikilinks pointing to non-existent pages |
+| 10 | **backups** | Backup directory present and recent backups exist |
 
 ### Exit codes
 
@@ -268,13 +267,12 @@ DocPlatform Health Check
 ✓ analytics_db          OK
 ✓ git                   OK (binary found)
 ✓ workspace_dirs        OK
-✓ orphaned_dirs         OK (0 found)
 ✓ sync_state            OK
 ✓ fs_db_consistency     OK (42 files, 42 records)
 ⚠ broken_wikilinks      WARNING (2 broken links found)
 ✓ backups               OK
 
-Result: 10/11 passed, 1 warning
+Result: 9/10 passed, 1 warning
 ```
 
 ### Bundle mode

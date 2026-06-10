@@ -126,7 +126,7 @@ For the complete walkthrough, see the [Getting Started](getting-started/index.md
 
 ### Operations
 
-- **Health diagnostics** — built-in `doctor` command runs 11 checks: FS/DB consistency, broken wikilinks, sync state, backups, and more
+- **Health diagnostics** — built-in `doctor` command runs 10 checks: FS/DB consistency, broken wikilinks, sync state, backups, and more
 - **Daily backups** — Automated SQLite backups with configurable retention
 - **Graceful shutdown** — Clean signal handling for zero-downtime deployments
 - **Structured logging** — JSON logs with request IDs for observability

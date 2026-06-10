@@ -200,7 +200,7 @@ This tool is only registered when the MCP server is started with a configured se
 
 ### API key scopes
 
-API keys support three scopes:
+API keys support five scopes — `read`, `write`, `delete`, `admin`, and `admin:read` (see [Authentication](../configuration/authentication.md#scopes) for the full model). The three content scopes map to MCP tools as follows:
 
 | Scope | Allows |
 |---|---|
@@ -210,7 +210,7 @@ API keys support three scopes:
 
 In addition to scopes, every tool call is checked against your **workspace role** — a `write`-scoped key held by a Viewer still can't write.
 
-By default, new API keys have all three scopes. You can restrict scope when creating the key.
+By default, new API keys have all three content scopes (`read`, `write`, `delete`). You can restrict scope when creating the key.
 
 ### Key format
 

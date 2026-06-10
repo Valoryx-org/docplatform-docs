@@ -10,7 +10,7 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.11.1] — 2026-06-10
+## [0.11.1] — 2026-06-06
 
 ### Security
 - **Sudo required on plan-override writes** — admin plan-override endpoints now demand a fresh WebAuthn step-up (#510), with hardened sudo/modal handling in the admin SPA (#509).
