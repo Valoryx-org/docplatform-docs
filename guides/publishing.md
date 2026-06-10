@@ -19,7 +19,7 @@ http://localhost:3000/p/my-docs/api/auth      → api/auth.md
 
 Pages are rendered from Markdown to HTML on request using goldmark (CommonMark-compliant) with Chroma syntax highlighting (Dracula theme) for code blocks.
 
-> **Slug limitation:** sites whose slug contains a `/` cannot be reached through the `/p/` path — they are only reachable through a custom domain. Keep slugs to a single path segment if you rely on `/p/` URLs.
+> **Slug limitation:** site slugs must be a **single path segment**. A slug containing `/` breaks routing both on `/p/` URLs and on custom domains (custom-domain requests are internally rewritten to `/p/{slug}/...`). Use a slug like `my-docs`, not `team/my-docs`.
 
 ### What appears on the published site
 
