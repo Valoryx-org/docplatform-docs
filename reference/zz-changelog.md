@@ -10,6 +10,114 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] — 2026-06-06
+
+### Security
+- **Sudo required on plan-override writes** — admin plan-override endpoints now demand a fresh WebAuthn step-up (#510), with hardened sudo/modal handling in the admin SPA (#509).
+- **Admin logs scrubbed of PII** — the admin binary's root logger is wrapped in a redaction handler (#507); observability mailers redact recipient PII and the metrics listener fails loud on bind errors (#495).
+- **Impersonation minting fenced out of the cloud binary** — regression test guarantees the cloud build cannot mint impersonation tokens (#508).
+- **Webhook event validation on update** — outbound-webhook event lists are validated on update as well as create, with a CI grep audit for SSRF regressions (#500).
+
+### Fixed
+- **Org switcher persisted** — `primary_org_id` is now saved when updating users, so the active organization survives re-login (#506).
+- **Cursor pagination corrected** in cross-org list endpoints — resumes after the cursor row with a stable `id` tiebreaker (#499, #502).
+
+### Changed
+- **Published-site themes single-sourced** — the 7-theme list now lives in one place and every consumer (API, MCP, publishing) validates against it (#503).
+
+## [0.11.0] — 2026-06-01
+
+### Security
+- **Outbound-webhook SSRF closed end-to-end** — create-time URL validation routes through the shared IP blocklist (#485) and delivery-time requests pin IPs and reject redirects (#476).
+- **API-key authorization bypass fixed** alongside a handler test-coverage parity sweep (#474).
+- **Account lockout applied to invitation acceptance** — the per-account lockout now also covers the invitation password path (#455).
+- **AI writing-assist actions whitelisted** at the handler boundary (#478).
+
+### Added
+- **Admin UI (early)** — WebAuthn login fixed end-to-end (#489), organizations list/detail (#492), audit-log viewer with CSV export (#493), sudo step-up modal and session-expiry banner (#491). The admin binary is not yet generally available.
+- **Operational metrics** — internal loopback `/metrics` listener (`METRICS_PORT`) with business gauges (#482) and git-sync worker counters/queue-depth gauge (#487).
+- **PII-scrubbing log handler** for cloud logs (#488).
+- **Playwright smoke suite** wired into CI as a runtime gate (#484).
+
+### Fixed
+- **Importer zip-bomb guard** for archive imports (#465).
+- **Reserved slugs rejected** when renaming an organization (#466).
+- **Release signing fails loud** with a cosign verify round-trip (#468).
+
+### Changed
+- **Frontend CSS built at compile time** — Tailwind JIT replaces the runtime engine, cutting 367 KB of eager vendor JS (#479); the admin SPA carries a no-external-CDN/web-font fence (#481).
+
+## [0.10.0] — 2026-05-16
+
+### Security
+- **Login timing oracle closed** — user enumeration via response timing is no longer possible (#442).
+- **Stored XSS fixed in the markdown render path** (#444) plus a defense-in-depth hardening bundle (#443).
+- **Upload-bomb protection** per SPEC-25 (#422).
+
+### Added
+- **Cloud edition shell** — plan chip, usage display, billing banner (#437), plan-limit upgrade modal (#438), `/api/v1/me/context` bootstrap endpoint (#435), and a clean two-SPA community/cloud split enforced by audit (#434).
+- **GDPR self-service** — personal data export (#420), org export foundation (#419), and password-gated account deletion (#421).
+- **MCP `publish_workspace` tool** with REST publish-toggle parity (#424).
+- **Production observability** — Prometheus alert rules and Grafana panels (#446).
+
+### Fixed
+- **Editor-cap errors unified** to `PLAN_LIMIT_REACHED` across all creation paths (#439).
+- **Dunning/billing email routed to the org creator** (#440).
+- **WebSocket hub goroutine leak on shutdown** (#441); **search engine close made idempotent** (#450).
+
+### Changed
+- **CI hardening** — enforced coverage gate, blocking govulncheck and Trivy scans, `-trimpath` builds (#445).
+
+## [0.9.0] — 2026-04-26
+
+### Added
+- **Publishing overlay (`.docplatform/publish.yaml`)** — git-reviewable publish decisions with read-fallback, write-side sync, and frontmatter-wins-on-write semantics (#387, #388, #389); `nav_order` frontmatter support.
+- **Workspace language** — `language` column wired through to the published site's `<html lang>` (#385).
+- **Reserved-handle validation** for workspace and org slugs (#386).
+- **Pre-deploy smoke test** (`make smoke`) wired into CI (#369, #390).
+- **Admin recovery foundations** — passkey re-enrollment tokens, recovery owner notification, and a 2-of-3 cosign recovery flow (#392–#394); Diceware recovery codes (#383). (Admin binary — not yet generally available.)
+
+### Fixed
+- **Billing webhook idempotency race closed** — atomic gate removes a time-of-check/time-of-use window (#382).
+- **Custom-domain TLS fails loud** when `CADDY_ASK_SECRET` is missing on cloud builds (#399).
+- **"Powered by Valoryx" badge truly hidden on paid plans** — the old relabel branch was removed; free-tier badge links to a plan-aware upgrade nudge (#400).
+
+## [0.8.0] — 2026-04-12
+
+### Added
+- **Workspace rename** from the settings UI (#291).
+- **Clearer member roles** — consistent role labels and an Owner badge (#258); invitation emails state the offered role (#259).
+
+### Fixed
+- **Billing plan validation** — `plan_id` checked against the database and unknown billing intervals rejected (#294).
+- **Git provider handler rejects empty provider names** (#293).
+
+## [0.7.1] — 2026-04-12
+
+### Security
+- **Git credentials encrypted at rest** — workspace `git_remote` credentials are now AES-256-GCM encrypted (#290).
+
+### Fixed
+- **API key creation includes `workspace_id`** (#289).
+
+## [0.7.0] — 2026-04-12
+
+### Added
+- **Drag-and-drop page moves** in the workspace tree (#271).
+- **Editable Welcome page and embedded Help tutorial** (#275).
+- **Published-page indicator** in the workspace tree (#256).
+- **Empty-remote bootstrap** — connecting an empty git repository initializes and pushes automatically, with an `ls-remote` preflight (#253).
+- **Pending invitations list** in workspace settings (#277).
+
+### Fixed
+- **Published sidebar rebuilt on every publish** so new pages appear immediately (#265).
+- **API key scope payload validation** with backfill of legacy rows (#272).
+- **Cookie-consent banner buttons** wired correctly; consent decisions logged (#252).
+- **Upstream tracking set after init-and-push** so subsequent pulls work (#255).
+
+### Changed
+- **Share Links panel removed from the UI** — page access is controlled by site visibility plus invitations (#273).
+
 ## [0.6.4] — 2026-04-08
 
 ### Security
@@ -45,9 +153,11 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **GoReleaser** — removed `-s -w` strip ldflags that caused SEGV on some platforms.
 - **valoryx.org** — "Join Waitlist" → "Get in Touch" (6 languages), pricing cards show "Best for" personas.
 
-## [1.0.0] — 2026-03-04 (Phase 1)
+## Phase 1 milestone — 2026-03-04
 
-Full commercial release with billing, MCP, custom domains, and admin panel.
+> Historical note: this entry was originally mislabeled "1.0.0". DocPlatform has not shipped a 1.0 release; this milestone landed between 0.5.1 and 0.6.x.
+
+Commercial feature milestone with billing, MCP, custom domains, and the workspace admin panel.
 
 ### Security
 - RS256 JWT (auto-generated RSA key pair, access + refresh tokens, JWKS-ready)
