@@ -10,6 +10,27 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.4] — 2026-06-10
+
+### Fixed
+- **Two-segment published-site slugs resolve** — `owner/repo`-style workspace slugs now work on `/p/{slug}/...` routes and custom domains; previously only single-segment slugs resolved, leaving multi-segment published sites unreachable except via subdomain (#518).
+
+### Changed
+- **cosign pinned to v2.6.3** — the cosign installer's default floated to cosign v3, whose new-bundle-format default ignores `--output-signature`/`--output-certificate` and failed the 0.11.3 release run at the signing step. Pinning preserves the documented `.sig` + `.pem` verification contract; adopting the v3 bundle format is tracked as a deliberate future change.
+
+## [0.11.3] — 2026-06-10
+
+### Note
+- Source-identical to 0.11.2 plus the pipeline fixes below. Its release run failed at the signing step (cosign v3 CLI drift); the GitHub release exists unsigned and was not published to the public channel. Superseded by 0.11.4.
+
+### Changed
+- **Release pipeline hardened** — release test/lint/security jobs moved to the self-hosted runner (the `-race` suite exceeded GitHub-hosted runners' 10-minute per-package limit and killed two release runs); GoReleaser version pinned; binaries are cosign-signed from the published release assets with the Fulcio certificate (`.pem`) shipped alongside each `.sig`, so `cosign verify-blob` works under cosign ≥ 2.0 (#515, #516). No product-code changes — source-identical to 0.11.2.
+
+## [0.11.2] — 2026-06-10
+
+### Note
+- Source-identical to 0.11.1 plus CI-only changes (#515). Its release run failed at the signing step (GoReleaser layout drift); the GitHub release exists unsigned and was not published to the public channel. Superseded by 0.11.3.
+
 ## [0.11.1] — 2026-06-06
 
 ### Security
