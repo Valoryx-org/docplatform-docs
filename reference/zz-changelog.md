@@ -10,6 +10,25 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.5] — 2026-06-12
+
+### Security
+- **Editor seat caps enforced on role promotion and share-link redemption** — role promotions check the cap (demotions and editor↔admin laterals never consult it, so no false denials) (#529), and share-link redemption re-checks it at use time: an unlimited-use editor link can no longer mint unbounded seats past the plan cap. Denials leave zero partial state (no membership row, no use-count burn) and surface the standard upgrade prompt (#536).
+- **Webhook signing secrets encrypted at rest** — outbound-webhook HMAC secrets are now AES-256-GCM-encrypted in the database via the same cipher and key that protect git credentials; decryption is transparent at the store layer; with the encryption key configured, stored rows never contain plaintext (deployments without `GIT_ENCRYPTION_KEY` retain prior behavior) (#532).
+- **Admin WebAuthn synced-passkey fix** — backup-eligible/backup-state credential flags are persisted and reconstructed, so synced passkeys (e.g. Windows Hello) no longer fail login with a flag-consistency error (#526).
+
+### Added
+- **Outbound webhook delivery engine, wired behind a flag** — the delivery engine (HMAC signing, retry with backoff, dead-lettering) is now constructed and running behind the boot flag `webhook_delivery_enabled`, default OFF. Wiring exposed and fixed two latent engine bugs that would have silently dropped every delivery. Events dispatch from the central content-mutation seam (`page_created`/`page_updated`/`page_deleted`); git-pull reconciliation deliberately does not emit (#527). The subscribable event list is trimmed to exactly the events that fire; legacy subscriptions to never-implemented events are visibly disabled by migration, and a webhook can no longer be re-enabled with an empty event list (#531).
+- **Admin console: five new views** — Users (cross-org list, search, detail with sessions) (#525), Billing overview (unit-honest tiles with Stripe deep-link) (#530), Custom Domains (persisted bindings, honest no-DNS-state) (#533), Platform Analytics (windowed traffic, honest disabled-state) (#534), and a sudo-gated break-glass Impersonation flow (one-shot link, credential never displayable; feature remains environment-disabled in production) (#535).
+- **Admin console: plan-override dialog** — set/clear plan overrides with WebAuthn sudo step-up and typed confirmation (#511).
+
+### Changed
+- **Business plan: pages capped at 500 per workspace** (cloud only; community remains unlimited) — migration 034 (#523).
+- **Plan overrides now take effect at runtime** — license enforcement resolves the effective plan as active-override-else-org-plan across all limit and feature checks; previously overrides were stored but never read (#524).
+
+### Fixed
+- **Web edits no longer drop unknown frontmatter keys** — Hugo/Jekyll metadata (`date:`, `author:`, `weight:`, arbitrary keys) survives the web-edit round-trip; files without extra keys serialize byte-identically, so no content-hash churn (#528).
+
 ## [0.11.4] — 2026-06-10
 
 ### Fixed
