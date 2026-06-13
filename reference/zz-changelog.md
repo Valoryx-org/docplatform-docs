@@ -10,6 +10,21 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.6] — 2026-06-13
+
+### Security
+- **Editor seat cap enforced on the invitation-accept and invitation/share-link-create paths** — the cap is re-checked when an invitation is accepted (#538) and is charged to the *workspace's owning org* (not the actor's) when an invitation or share-link is created (#537), closing two grant paths that previously bypassed the limit. This extends the v0.11.5 promotion/redemption checks (#529, #536); the creator's auto-granted seat at workspace-create (ops#273 item 4) is tracked separately and is **not** in this release. (ops#273 items 2 & 3)
+- **Admin bootstrap (re-)enrollment hardened** — added an audit of the admin bootstrap re-enrollment path, a backup-eligible/backup-state (BE/BS) credential round-trip regression net, and a lockout-remediation runbook (ops#277) (#539).
+
+### Changed
+- **Admin console: parity-series tile/number helpers unified** and `AdminBoot.version` reconciled with the build version (admin binary; not yet deployed) (ops#266) (#542).
+- **Dependencies** — `github.com/mark3labs/mcp-go` 0.54.0 → 0.54.1 (#514).
+
+### Internal
+- **CI: `test-admin` serialized after `test`** (`needs: [test]`) to end the deterministic shared-runner `-race` timeout collision between the two heaviest suites (ops#198) (#544).
+- **`modernc.org/sqlite` held at 1.50.1** — the 1.52.0 bump (#513) was reverted from this release pending investigation of a test-suite performance regression that pushes the `internal/api/handlers` `-race` suite over its CI timeout (ops#304, ops#305). Production is unaffected (it already runs 1.50.1).
+- **CI: `actions/checkout` 6.0.2 → 6.0.3** (#512).
+
 ## [0.11.5] — 2026-06-12
 
 ### Security
