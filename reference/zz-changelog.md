@@ -10,6 +10,55 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] — 2026-06-23
+
+### Added
+- **MCP server is now mounted on the main app at `/mcp`** — the AI-native flagship: the full tool surface over Streamable HTTP, with graceful SIGTERM connection drain. Previously `/mcp` was served as SPA HTML. (ops#33, ops#106) (#559)
+- **Admin credential self-management UI** — add a second passkey and regenerate recovery codes while logged in (owner anti-lockout). (ops#324) (#562)
+- **Cloud billing boot fail-fast** — a cloud build with billing enabled but an unusable Stripe config now refuses to start, instead of booting "healthy" and 500-ing every checkout. Hardened to trim config at the source, reject bare-prefix keys, and loudly surface partial/disabled billing config. (ops#320, ops#342) (#569, #573)
+
+### Security
+- **`/mcp` is host-guarded off customer custom domains and sheds tokenless request floods** before the JSON-RPC parser. (ops#325) (#561)
+- **GDPR right-to-erasure scrubs only the target user, not the whole org** — analytics anonymization was org-scoped; it now erases just the deleted user. (audit P1 #6, ops#329) (#565)
+- **GDPR right-to-erasure now scrubs `analytics_consent_log` PII** (user_id / workspace_id / ip_hash / user_agent) on both the admin and customer self-service delete paths, retaining the anonymized consent decision as Article 7 proof. (ops#332) (#572)
+
+### Fixed
+- **MCP `/mcp` data race under shutdown** — the per-request context is detached from the fasthttp RequestCtx so the notification-forwarder goroutine cannot race fasthttp teardown during drain. (ops#336) (#571)
+- **Static-site export is self-contained** — exported pages carry the resolved theme and a static hash-based CSP, instead of an empty nonce that blocked all inline JS. (audit P1 #7) (#570)
+- **Editor "keep my changes" conflict-override + crash-durable save** — the force path no longer 400s on an empty hash, and a save records a crash-durable recovery row. (audit P1 #8/#10, ops#331) (#566)
+- **Search indexes tags as discrete terms** and removes the dead AI keyword-boost branch. (audit P2 #11, ops#335) (#568)
+- **Published `/changelog` publishes from the main tip, not the tag commit** — fixes the ~2-release-stale changelog. (audit P2 #12, ops#333) (#567)
+
+### Internal
+- Re-adopt `modernc.org/sqlite` 1.50.1 → 1.52.0. (ops#305) (#560)
+- CI: pin heavy `-race` jobs to the full-power runner via a `bigcpu` label (ops#321) (#556); migrate once into a template DB cloned per test (ops#304) (#558); degrade the usage-report runner-roster 403 instead of failing the whole report (ops#322) (#557).
+
+## [0.11.8] — 2026-06-16
+
+### Security
+- **Cross-org membership write is now ordered AFTER the identity proof on invitation-accept** — a leaked-token-without-password caller can no longer write membership (or resurrect an archived, role-elevated membership) before proving identity; the write is atomic with workspace AddMember + invitation Accept. (#285) (#550)
+- **Custom domains gated to paid plans at the attach path** — Free → 403, Team/Business → 200, via the PLAN_LIMIT feature-lock (#261); the default plan is edition-gated fail-closed (cloud → free, community → community) (#260). (#551)
+
+### Fixed
+- **Sync errors are surfaced instead of swallowed** — migration 037 adds an `error` status to `git_sync_state`; the surfaced message redacts `scheme://userinfo@` credentials before truncation. (#5) (#552)
+- **Git remote URLs validated pre-DNS** — additive SSRF hardening (rejects doubled-credential prefixes / missing repo path) without weakening existing checks. (#4) (#552)
+- **Published-page conditional-GET 304 revived** — `If-None-Match` is now compared against the same `"<hash>-<epoch>"` validator that is emitted (it was compared against the bare `"<hash>"`, so 304 never fired); paired with active render-cache invalidation on workspace mutation. (#3) (#552)
+
+## [0.11.7] — 2026-06-15
+
+### Security
+- **Creator's auto-granted seat is now charged against the editor seat cap at workspace-create** — closes the last bypass in the seat-cap series (the create path was previously ungated). Completes the v0.11.5/v0.11.6 promotion/redemption/accept checks. (ops#273 item 4) (#540)
+
+### Fixed
+- **Webhooks: deliveries are held (not dropped) when a configured signing secret is unresolvable** — fail-closed rather than sending unsigned, with the hold surfaced in `GitSyncState` (ops#292 activation-gate B1) (#541).
+- **Webhooks: PATCH semantics for the signing secret on update** — updating a webhook no longer clobbers an unset secret field (ops#292 activation B2) (#546).
+
+### Internal
+- **CI: `internal/api/handlers` `-race` suite given timeout headroom (18m → 26m)** on both `test` and `test-admin` — the suite straddles the old 18m per-package cap under load and flaked the merge queue. Interim mitigation; root cause is the per-test 27-migration fixture cost (ops#304) (#553).
+- **CI: failure-alerting restored and Health Sweep red-run noise stopped** (ops#297) (#545).
+- **CI: external uptime-monitor matrix added to Health Sweep** (Workstream H) (#519).
+- **Dependencies** — `golang.org/x/net` 0.55.0 → 0.56.0 (#549).
+
 ## [0.11.6] — 2026-06-13
 
 ### Security
