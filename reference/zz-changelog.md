@@ -10,6 +10,17 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1] — 2026-07-02
+
+### Fixed
+- **Cloud git PAT-connect wizard now actually syncs.** The "connect a repo → pick branch → Connect & Sync" flow reported success while writing only the connection record — it never set the workspace's git remote, so every sync path (initial sync, the poll loop, inbound webhooks) silently no-oped. The connect transaction now activates the workspace, and the auto-webhook is registered with a real callback URL and the persisted secret (previously an unusable empty URL + throwaway secret); the clone URL is SSRF-validated like the manual path; disconnect clears the fields again. (ops#352) (#583)
+
+### Added
+- **Remove a member from a workspace.** Workspace admins can now remove a single member from a workspace (Settings → Members → Remove) — previously the only removal path was an org-wide archive with no UI. Guards against removing yourself or the last workspace admin; the seat frees immediately. (ops#351) (#584)
+
+### Security
+- **SPA HTML-attribute escaping hardened.** `escapeHtml` now also escapes quote characters, closing an attribute-injection vector for user-controlled display names/emails/slugs interpolated into HTML attributes across the app. (#584 review)
+
 ## [0.13.0] — 2026-07-02
 
 ### Added
