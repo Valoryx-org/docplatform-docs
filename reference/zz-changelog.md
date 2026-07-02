@@ -10,6 +10,21 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] — 2026-07-02
+
+### Added
+- **Versions UI** — Settings → Versions tab (both editions): list, create, set-default, and delete workspace documentation versions, wired to the existing versions API; typed-slug delete confirmation and duplicate-slug guard. (U-02) (#576)
+- **Privacy & data self-service UI (cloud)** — customers can export their data (JSON) and delete their account (typed-confirm modal) from Settings, without contacting support. (U-06) (#580)
+- **Invite-only mode** — `DOCPLATFORM_DISABLE_SIGNUP=true` blocks public registration (403 `SIGNUP_DISABLED`) and OIDC first-login auto-provisioning, while invitation-accept and share-link joins keep working; `/api/auth/providers` exposes `signup_disabled` so the login screen hides the register form. (community#6) (#577)
+- **Tunable login lockout** — `DOCPLATFORM_LOGIN_LOCK_THRESHOLD` / `DOCPLATFORM_LOGIN_LOCK_DURATION_SEC` make the existing per-account lockout policy configurable (defaults unchanged: 5 attempts / 900 s), with fail-fast config validation. (#577)
+
+### Security
+- **GDPR right-to-erasure now reaps residual PII on BOTH deletion paths** (admin hard-delete and customer self-service): invitation rows matching the user's email are deleted (empty-email guarded), and terms-acceptance IP/user-agent are blanked while retaining the acceptance itself as Article 7 proof. (ops#343) (#580)
+
+### Internal
+- Release pipeline verifies valoryx.org serves the new version post-publish and fails loudly if not (#578); health-sweep gained a version-drift monitor (live site vs latest release, 45-min grace) (#579).
+- Test-only `DOCPLATFORM_RATE_LIMIT_DISABLED` escape hatch for the ephemeral e2e instance — construction-time, loud WARN, never set in production (#576); CI actions bump (#575).
+
 ## [0.12.0] — 2026-06-23
 
 ### Added
