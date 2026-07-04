@@ -10,6 +10,39 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] — 2026-07-04
+
+### Changed
+- **New Profile page; workspace Settings is workspace-scoped again (both editions).**
+  Everything account-scoped moved to `#/profile` (alias `#/account`), entered via the
+  bottom-left user block: your identity and password (both editions), plus Plan & Billing
+  and Privacy & data (cloud). The Billing and Privacy & data tabs are gone from workspace
+  Settings in both editions — Settings now renders identically everywhere and only
+  workspace concerns. (D-014, revives #137) (#588)
+- **Upgrade links now land somewhere real.** The sidebar plan-chip "Upgrade" link (previously
+  the workspaces index) and the plan-limit modal's "View billing" fallback (previously a
+  nonexistent route) both open the Profile page. (#588)
+- **Custom-domain setup copy shows your deployment's actual CNAME target** (server-derived)
+  instead of a hardcoded `valoryx.dev` — self-hosted community instances no longer get wrong
+  DNS instructions. Custom domains remain available in BOTH editions. (ops#354 N2) (#588)
+
+### Fixed
+- **No more false "plan limit reached" for already-seated editors.** Every editor-seat gate
+  (role change, org assign, share-link join, invitation create/accept) now recognizes a user
+  who already holds an editor seat elsewhere in the org — granting them another editor role
+  cannot grow the distinct-seat count, so it is no longer denied at cap. Genuinely new seats
+  are still enforced, and seats stay strictly org-scoped. (ops#273 item 5) (#587)
+
+### Internal
+- Community bundle edition purge: all plan/billing/upgrade language now lives only in the
+  cloud bundle (new `mountProfileCloudSections` / `renderPlanGateNotice` seams); frontend IA
+  contract documented at `internal/frontend/src/README.md`. (#588)
+- `make deploy` now refuses the cloud production host (it builds the community edition —
+  the 2026-05-17 wrong-edition class is structurally blocked); cloud deploys go through
+  `deploy-prod.sh`. (#588)
+- `scripts/preflight.sh` — the full 27-check local pre-PR gate (builds/vet/lint for all three
+  editions, dist parity, edition guards, symbol audits, gate-list parity with CI). (#586)
+
 ## [0.13.1] — 2026-07-02
 
 ### Fixed
