@@ -10,6 +10,39 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] — 2026-07-05
+
+### Added
+- **MCP client onboarding.** The API-keys page now has a "Connect an MCP client" card
+  showing the deployment's MCP endpoint URL and a ready-to-paste Claude Desktop / Cursor
+  config; a newly created key renders the same config inline with the key pre-filled. (#596)
+- **Plan-aware MCP rate limits (cloud).** MCP requests are now rate-limited at the caller's
+  plan tier — Team 120/min, Business 300/min — instead of always the community floor. An
+  unresolvable key fails safe to the community floor (30/min). (#596)
+- **Env-configurable MCP rate-limit tiers (self-hosted).** The per-plan MCP request-rate
+  limits (community 30/min, Team 120/min, Business 300/min) are now overridable at boot via
+  the `MCP_RATE_LIMIT_{COMMUNITY,TEAM,BUSINESS}_RPM` env vars. Defaults are unchanged, so
+  behavior is byte-identical to before unless an operator sets them. (ops#377) (#606)
+
+### Changed
+- **Stable data directory (self-hosted / community).** `DATA_DIR` no longer defaults to a
+  CWD-relative `.docplatform`, which caused a binary on PATH to create a fresh empty database
+  in every terminal's working directory (data appearing to "disappear" between sessions). The
+  location is now resolved by a fixed precedence, and `doctor` reports which rule selected it
+  (explicit / legacy / default). Cloud/prod set `DATA_DIR` explicitly and are unaffected. (#591)
+- **Billing links point at the account page.** All backend-generated billing links —
+  transactional-email CTAs, Stripe checkout/portal return URLs, and the free-tier badge nudge —
+  now route to `#/profile` (the account/billing page) instead of the `/settings/billing` route
+  retired in 0.14.0. Centralized behind one source of truth and fenced against reintroduction. (#598)
+
+### Fixed
+- Members-tab role selector no longer offers deferred/legacy roles (commenter, space_admin);
+  a member already on a legacy role keeps it shown as the selected "(legacy)" option — it can
+  be changed away to a current role but is never offered for re-assignment. (#593)
+- Search results now render their excerpt (the UI was reading a field the API does not emit). (#596)
+- A share-link visitor who follows a join link while logged out is returned to the join after
+  signing in, via a same-origin-only redirect guard. (#596)
+
 ## [0.14.0] — 2026-07-04
 
 ### Changed
