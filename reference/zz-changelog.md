@@ -10,6 +10,96 @@ All notable changes to DocPlatform are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.16.0] — 2026-07-12
+
+<!-- The Upgrade-notes block below is the DD-10 transition obligation (funnel
+     v3 §12 "Transition" row) — the launch harness (T7) asserts its marker
+     text is present in this file; do not drop or reword it casually. -->
+
+### Upgrade notes
+- **Adopting a package manager? Carry your folder-local data with you.** An install whose
+  data lives in a launch folder's `.docplatform` (any install created before the stable
+  data-directory change in 0.15.0, or one still launched from that folder) keeps working in
+  place — but a packaged binary (brew/winget/scoop) launches from a different working
+  directory, so it will NOT find that folder and starts a fresh, empty per-user data
+  directory instead; because the JWT signing key lives with the data, existing sessions are
+  also signed out. Nothing is moved or deleted — the old folder is just left behind.
+  **One-time remedy:** run `docplatform doctor` from the old launch folder — it prints the
+  exact `DATA_DIR=<path>` line — and set that environment variable wherever the packaged
+  install runs. `doctor` reports which rule resolved the data directory in every mode. (DD-10) (#625)
+
+### Added
+- **Double-click (or bare `docplatform`) now starts the server and opens your browser
+  (community desktop launch).** Launching the binary with no arguments from Explorer /
+  Finder / an interactive terminal starts the server if nothing is running on that data
+  directory and opens the browser on the served URL (every double-click launch; first
+  run only from an interactive terminal), announced in the banner (`--no-browser` or `DOCPLATFORM_NO_BROWSER=1` to disable). If an instance is
+  already running there, the launch **re-enters it**: the browser opens (or the URL is
+  printed) on the running instance's *actual* port — including a custom `--port` it was
+  started with — and no second server ever starts. Headless / service / piped invocations
+  are byte-identical to before: bare prints today's CLI help, `serve` behaves exactly as it
+  always has (INV-7). (#622, #638)
+- **`docplatform open` / `status` / `stop`.** `open` opens the running instance in your
+  browser (prints the URL headless); `status [--json]` reports url/pid/port/version with
+  zero side effects; `stop` confirms the instance's identity, asks it to drain gracefully
+  via a loopback-only control endpoint, and `stop --force` escalates only against a pid it
+  can verify is a DocPlatform instance. Exit code 3 = "not running" (LSB convention). (#637)
+- **Single-writer safety on the data directory.** A second `serve` against a data directory
+  that already has a live instance now refuses loudly on *any* port — with the running
+  instance's port and pid in the message — instead of silently double-writing the database.
+  The instance also records a small `runstate.json` descriptor (written only after a
+  successful bind, removed on exit) that the re-entry commands read as a hint; the OS-level
+  file lock remains the source of truth. (#626, #634)
+- **Friendly interactive terminal output.** On a real terminal, `serve` now logs in
+  human-readable text (headless/service runs keep JSON for log shippers) and prints a ready
+  banner *after* the port is actually bound, with the served URL and the absolute data
+  directory. (#617)
+- **Desktop launches roam to the next free port.** If the configured port is busy, a
+  double-click / bare interactive launch tries the next ports (up to +9) and announces the
+  roamed URL; explicit `serve`, `--port`, and headless invocations keep today's
+  deterministic bind error. (#638)
+- **Closing the terminal now drains gracefully (unix).** SIGHUP joins SIGINT/SIGTERM in the
+  interactive signal set with a mode-aware drain budget, so closing the terminal window
+  behaves like Ctrl+C instead of killing requests mid-flight. (#621)
+
+### Changed
+- `/api/health` now includes an additive `instance_id` field (a per-process random 128-bit
+  hex id) that the re-entry commands use to confirm they are talking to the instance they
+  found on disk. (#626)
+- mcp-go bumped to 0.55. (#563)
+- All diagnostics now go to stderr — `status --json` (and every command's stdout) is clean,
+  scriptable output; on a terminal, diagnostics render as text, JSON otherwise. A cloud-only
+  configuration warning no longer appears in community builds. (ops#439, ops#434) (#642)
+- The port-conflict error for explicit `serve` now ends with a hint naming `--port`; the
+  underlying OS error and exit code are unchanged. (ops#440) (#642)
+- Launch, status, and stop messages rewritten for clarity — internal jargon removed,
+  consistent naming, and the ready banner now says how to stop. (#640)
+
+### Fixed
+- **MCP tools advertise their input schemas again.** All 43 tool-argument fields across
+  the MCP tools had silently lost their generated input schemas (properties, types, `required[]`) to a jsonschema tag
+  incompatibility — agent clients saw parameterless tools. (issues#389) (#613)
+- Duplicate/conflicting rate-limit headers on `/mcp` responses: one header authority now
+  stamps both surfaces. (issues#395) (#614)
+- Community edition: an unauthenticated visit to `/` now routes to `/login` instead of the
+  Cloud marketing landing. (#387) (#610)
+
+### Security
+- **MCP rate limiter: tokenless and garbage-token requests are now bounded.** The standalone
+  `mcp-server` transport had no pre-auth gate (tokenless traffic was unlimited), and any
+  junk Bearer token bought a fresh rate bucket plus a DB round-trip per unique token on the
+  in-app surface. Both vectors now share the spoofing-safe per-IP floor. (issues#385) (#612)
+- gofiber/fiber bumped v2.52.13 → v2.52.14 (CVE-2026-45045, X-Real-IP spoofing;
+  verified not-affected in this codebase, bumped defensively). (#618)
+
+### Internal
+- Three-layer launch-UX measurement rig in CI: headless + PTY harnesses on every PR
+  (self-hosted), OS-specific acceptance (windows/macos) release-gated. (#611)
+- 13-mcp e2e suite rewritten hermetic against the live in-process `/mcp` transport (#609);
+  e2e SSH config no longer defaults to the decommissioned runner box (#608).
+
 ## [0.15.0] — 2026-07-05
 
 ### Added
