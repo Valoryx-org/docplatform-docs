@@ -12,6 +12,28 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.16.1] — 2026-07-12
+
+### Fixed
+- **Double-clicking the Windows binary in Explorer now actually launches DocPlatform.**
+  The CLI framework's built-in Windows guard ("This is a command line tool. You need to
+  open cmd.exe and run it from there.") intercepted every real Explorer double-click and
+  exited before the 0.16.0 desktop launch could run — the launch flow itself was correct
+  but unreachable from Explorer, and no automated test could catch it (the guard keys on
+  the parent process being Explorer itself). The guard is now disabled: a double-click
+  starts the server and opens your browser as designed. Launches from a terminal, scripts,
+  and services were never affected. (#646)
+
+### Changed
+- MCP over HTTP: the library's new localhost DNS-rebinding protection (arrived with the
+  dependency update below) is now explicitly disabled rather than incidentally inert,
+  with the reasoning documented in code. Behavior is unchanged — reverse-proxied and
+  localhost clients keep working identically, and every MCP tool call still requires an
+  API key. (#648)
+- Dependency maintenance: mcp-go 0.56.0, goldmark 1.8.4, go-isatty 0.0.22, x/net 0.57.0,
+  x/sys 0.47.0 (plus transitive x/crypto 0.54.0, x/text 0.40.0). Routine updates — no
+  security fixes claimed. (#643)
+
 ## [0.16.0] — 2026-07-12
 
 <!-- The Upgrade-notes block below is the DD-10 transition obligation (funnel
