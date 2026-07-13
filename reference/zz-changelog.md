@@ -12,6 +12,26 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.16.2] — 2026-07-12
+
+### Security
+- **Organization email settings can no longer repoint the server's mail transport (account-takeover fix).**
+  Previously any organization super admin — which, on the cloud, is every self-registered user for
+  their own workspace — could call the org email-settings endpoint to reconfigure the single,
+  process-wide email sender shared by password-reset delivery, and could persist mail credentials
+  (including plaintext SMTP/Resend secrets) into organization settings. A malicious signup could
+  therefore redirect every user's password-reset email to an attacker-controlled relay and take over
+  accounts. Email transport is now configured **only** from environment variables (`SMTP_*` /
+  `RESEND_*`); the runtime settings endpoint is read-only and refuses changes, the generic org-settings
+  endpoint no longer accepts an `email` key, and a migration removes any email config previously
+  persisted. (#460)
+
+### Changed
+- **Self-hosted (Community): email is configured via environment variables, not the in-app settings
+  form.** Set `SMTP_HOST`/`SMTP_PORT`/`SMTP_FROM`/`SMTP_USERNAME`/`SMTP_PASSWORD` or
+  `RESEND_API_KEY`/`RESEND_FROM` and restart. The in-app "Email Configuration" form no longer applies
+  changes (it was already non-functional and is superseded by the security fix above). (#460)
+
 ## [0.16.1] — 2026-07-12
 
 ### Fixed
