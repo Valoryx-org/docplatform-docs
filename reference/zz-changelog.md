@@ -12,6 +12,26 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.16.3] — 2026-07-14
+
+### Fixed
+- **Saving a theme no longer wipes your published site's settings (silent data loss).**
+  Saving a theme through the workspace admin panel overwrote the whole published-site
+  settings record, destroying the site's navigation; changing visibility also silently
+  reset the chosen theme back to default. All settings writers (admin theme/navigation
+  and the MCP `update_theme` tool) now merge onto the existing settings, preserving every
+  key the request does not carry (including the paid-plan "show badge" opt-in, before its
+  own save UI ships) — and a stored settings record that cannot be parsed is refused with
+  an error rather than overwritten, so an unreadable record is never destroyed. Settings
+  lost to earlier saves are not recoverable; this stops the loss going forward. (#667)
+
+### Changed
+- **The content-import endpoint now tells the truth: `501 Not Implemented`.**
+  `POST /api/v1/workspaces/:id/import` previously accepted the upload, saved it to disk,
+  and then always failed internally (no import ever ran — there is no import worker yet),
+  leaving an orphaned file behind. It now returns `501` immediately, with no side effects,
+  until real community↔cloud content transfer ships (WS-H). (#666)
+
 ## [0.16.2] — 2026-07-12
 
 ### Security
