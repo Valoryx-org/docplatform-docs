@@ -12,6 +12,117 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-08-04
+
+### Upgrade notes
+- **A workspace-bound API key's scope is now enforced.** Creating an API key already let you
+  bind it to one workspace, but nothing checked that binding at use time — a workspace-A key
+  could read/write workspace-B content, list every workspace on the account, and (for an org
+  super admin's key) reach org billing and data export. That binding is now enforced on every
+  REST route and both MCP transports. If you rely on API keys in a production install, run
+  `docplatform doctor api-keys` before upgrading — it reports exactly how each existing key's
+  reach will change. (#697)
+
+### Added
+- **API keys can be scoped to a single workspace, for real.** See the Upgrade note above for
+  what changes for existing keys. (#697)
+- **Connect a git remote to a workspace no matter what's on either side.** Connecting a
+  workspace to git previously only worked cleanly when the remote already had the expected
+  branch; an empty remote, a workspace with existing local content, or a not-yet-created
+  branch could leave the connection stuck. All combinations of local/remote state are now
+  handled, and pre-existing content is never silently overwritten — it's preserved via
+  conflict artifacts or a full backup for you to resolve. A workspace connected while the
+  server is running joins live sync immediately instead of waiting for a restart. (#740, #746,
+  #744)
+- **Deleted pages can be restored for 30 days.** Deleting a page now moves it to a "Recently
+  Deleted" list (workspace header → Recently Deleted) instead of removing it outright, and it
+  can be restored from there. The delete confirmation no longer claims the action "cannot be
+  undone" — for git-synced workspaces it also now says whether the delete was pushed
+  automatically or still needs a commit. (#731, #736, #738)
+- **Importing content into a workspace now actually works.** Uploading a `.zip` of markdown
+  files (`POST /workspaces/:id/import`) previously accepted the upload, then always failed
+  afterward and orphaned the file on disk — there was no worker to process it. It's now a real
+  background job: the archive is validated and safely staged, then merged into the workspace
+  without touching any page the archive doesn't provide. Refused up front for git-connected
+  workspaces, which already have a sync path in. (#726, #730, #737, #745, #747)
+- **Publish workflow: Share dialog, Homepage picker, manual Rebuild, and a link-quality
+  panel.** A new Share button/dialog on a workspace copies the public link (or explains why
+  it isn't public yet, with one-click fixes); a Homepage picker in Published Docs settings
+  lets an admin choose which page serves the site root; a Rebuild button re-indexes and
+  re-validates the published site on demand, next to a quality-report panel surfacing broken
+  or unresolved links; a published page a member can edit now shows an "Edit in DocPlatform"
+  bar. (#723, #724, #725, #727, #729, #732)
+- **The Storage tab in Workspace Settings now reflects real configuration**, instead of always
+  reading "Local filesystem" even for a git-synced Cloud workspace. It shows the real sync
+  state, a copyable data-directory path or `git clone` command as appropriate, and — wherever
+  the server's own filesystem path is hidden — a one-click "Download Export" for getting your
+  files out. (#705)
+- **Exporting a non-git workspace now includes your actual page content** as markdown files,
+  not a placeholder README pointing back at the app. (#728)
+
+### Changed
+- The inert **Versions** tab is hidden from Workspace Settings until it does something real
+  (creating a version doesn't yet snapshot content, and nothing reads a version back). (#678)
+- Workspace Settings polish: Custom Domain and Analytics moved to the end of the settings
+  tabs, the Git Sync setup card now walks through the token steps in order, and changing a
+  member to or from workspace admin now asks for confirmation (other role changes stay
+  instant, matching the "friction only where a mistake is costly" principle). (#701)
+- Cloud billing now shows real plan prices (Team $29/mo, Business $79/mo) instead of "Free"
+  for every paid plan, and a free-tier org's own plan now reads "Free" instead of "Community"
+  (the name of the separate self-hosted edition, not a Cloud tier). (#687)
+- Self-hosted installs: the workspace data-directory path is now shown to workspace admins by
+  default (previously hidden unless an operator explicitly opted in) — it's the admin's own
+  machine. Cloud is unaffected: it continues to hide the server's filesystem path from
+  workspace admins by default. (#705)
+
+### Fixed
+- Folder-delete confirmation no longer claims the action "cannot be undone" — bulk folder
+  delete uses the same recoverable soft-delete as single-page delete. (#750)
+- Password reset and password change now tell the truth when the server has no email
+  configured, instead of claiming a reset email was sent that never arrives — with a
+  `docplatform reset-password` CLI fallback pointed to instead. The Welcome Wizard is now
+  actually reachable on a real first registration (it previously could only be triggered by
+  emptying an existing account's workspace list, never by registering); its now-dead
+  in-wizard SMTP-setup step was replaced with guidance to the real environment-variable
+  configuration. (#708)
+- Accepting an invitation as a new user is now atomic — a crash or a seat-limit denial
+  partway through provisioning could previously leave a permanently half-created user
+  account. Clicking an invite while signed into a different account now shows both email
+  addresses with a "Sign out and continue" option, instead of an opaque "email does not
+  match" error. (#712)
+- Closed a race where two concurrent invitation accepts, role promotions, or workspace
+  assignments could push an organization's editor count over its plan's seat limit. (#706)
+- Saving organization settings no longer silently drops settings keys it didn't itself send —
+  for example, a platform-owner rate-limit override could previously be wiped by an unrelated
+  tenant save. The org email-settings endpoint no longer exposes the platform's mail-relay
+  host/port/sender address to every org super admin. (#686)
+- Saving a published site's settings (theme, navigation, visibility) is now transactional,
+  closing a race where two concurrent saves could silently drop one of them. (#681)
+- Search tags now match case-insensitively (`Go` and `go` are the same tag). (#688)
+- A new workspace's seeded starter pages ("Getting Started") now actually appear in the page
+  list on first load, instead of existing only on disk until a manual sync; the publish flow
+  now tells an admin who can see their published site (members-only by default) instead of
+  leaving that silent. (#713)
+- The Homepage picker (Published Docs settings) now shows the currently-saved value instead
+  of always resetting to "Default" on reload; a published page's "Edit in DocPlatform" link
+  now opens the page that's actually being served, even when the configured homepage was
+  unavailable and the site degraded to a fallback page. (#732)
+
+### Security
+- **The update checker no longer contacts valoryx.org.** Every self-hosted install checked in
+  with `valoryx.org` on every boot; it now checks GitHub's own release API instead — a host
+  every install already talks to in order to download the binary — and sends no version or
+  install identifier, only a generic user agent. (#714)
+- **The app's own fonts are now self-hosted.** Every page load previously fetched fonts from
+  Google, disclosing the visiting user's IP to Google on every view. The 3 font families used
+  by the live app UI are now bundled and served from the app itself, and Google Fonts' CSP
+  allowances were removed from that surface. (Exported/published documents and their preview
+  image are not yet covered — tracked separately.) (#722)
+- Privacy policy updated to v1.2 to accurately describe the update-check and font-hosting
+  changes above, and to scope the self-hosting claim honestly (the not-yet-covered
+  published-document fonts and preview image are named explicitly rather than implied
+  covered). (#742)
+
 ## [0.16.3] — 2026-07-14
 
 ### Fixed
