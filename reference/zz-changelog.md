@@ -12,6 +12,89 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.1] — 2026-08-19
+
+A security and correctness release. Every change is a fix, and **no database migrations run** —
+upgrading is a binary swap.
+
+### Security
+
+- **Signing in with Google or GitHub could hand you someone else's account.** If you already had
+  an account linked to that provider, and the provider later issued a *different* identity for
+  the same email address — the case when an address is recycled or re-registered — the sign-in
+  was accepted and a session created for the original owner's account, despite the code
+  intending to refuse it. That path now returns the same "log in with your password first to
+  link this account" refusal the different-provider case already gave. Accounts that never
+  linked an OIDC provider were never in scope. **If you sign in with Google or GitHub, this is
+  the reason to upgrade.** (#767)
+- **Logging out now revokes your access token on the auth routes.** Logout cleared the session
+  but left the already-issued access token usable until it expired on its own. This affected the
+  `/api/auth/*` routes (`/me`, `/sessions`, `/ws-token`, `/accept-terms`) and the WebAuthn
+  routes; `/api/v1/*` already checked the session store and was unaffected, so your documents
+  were not reachable after logout. (#754)
+- **Revoking a session now disconnects its live connection.** A revoked session kept its open
+  WebSocket and carried on receiving page updates until the connection happened to drop.
+  Revocation is now enforced when a socket is opened (immediately) and re-checked on already
+  established connections at the next keepalive, so an open socket closes within about a minute
+  rather than lasting indefinitely. (#758)
+- **MCP workspace tools enforce org-level authorization.** `create_workspace` accepted any
+  organization member; it now requires an org super admin and refuses workspace-scoped API keys
+  outright. Separately, `list_workspaces` no longer lets an org-wide API key keep enumerating
+  every workspace after its owner has lost org super admin — a plain user session, and a key
+  bound to one workspace, behave exactly as before. (#755)
+
+### Fixed
+
+- **Readers of a published site are returned to the page they asked for.** On a site published
+  as "authenticated", a reader who followed a link and signed in was sent to their workspace
+  list instead of the document they were trying to read. (#771)
+- **Billing and security emails are no longer silently discarded.** With no mail provider
+  configured, queued messages were marked "sent" without being delivered and could never be
+  re-sent — affecting payment-failure notices, trial-ending warnings, subscription changes and
+  recovery-code alerts. Such a message is now left queued and still due, so it is delivered once
+  mail is configured instead of being lost. (#772)
+- **Git sync no longer loses adopted content, and server-side commits have an identity.**
+  Adopting existing content into a git-connected workspace could write the restored files to the
+  working tree and then discard the only backup without ever committing or pushing them — the
+  workspace reported "Synced" while that content existed nowhere in git history. Separately,
+  commits created by the native git engine could fail outright for want of a committer identity.
+  (#763)
+- **A new workspace's first search finds its starter pages.** The seeded README and
+  getting-started pages were never added to the search index, so searching a brand-new workspace
+  returned nothing. Page tags were also fragmented in the workspace manifest served to AI agents — tags are stored
+  as a JSON array but were split on commas when the manifest was generated, so every request
+  returned broken tags. Nothing stored was corrupted. (#757)
+  *Content that arrives by git sync, import or migration is still not indexed — that fix is
+  separate and has not shipped yet.*
+- **Self-hosters can sync with a git server on a private network.** `GIT_ALLOWLIST_PRIVATE`, the
+  documented escape hatch for a LAN Gitea or GitLab, was compiled out of every published binary
+  by a build tag no build ever set — so the documented setting did nothing. (#769)
+- **The setup wizard no longer shows cloud users self-hosted instructions.** It told cloud
+  tenants to edit environment variables on "their server" and to create a workspace that already
+  existed. (#770)
+- **Published sites can be unpublished, and share links revoked.** Both actions previously
+  existed in one direction only — you could publish a site and create share links with no
+  supported way to undo either. This adds the missing controls: a Site Status card with an
+  explicit Unpublish action, and a dialog listing active share links so they can be revoked.
+  (#759)
+- **Invitations still reach people when email is not configured.** The fallback that surfaces an
+  invite link directly keyed on the wrong condition, so on installs without SMTP an invitation
+  could be created with no way for anyone to accept it. (#760)
+- **The git-conflict popup's buttons called a route that did not exist.** When git sync hit a
+  conflict, the server notified the open app and it raised a conflict popup — whose resolve
+  buttons posted to a path the server never mounted, so they could not resolve anything. Those
+  calls now target the real route. **This popup is still not fully working:** the notification
+  carries a list of conflicting paths while the popup expects a single page, so it cannot yet
+  complete a resolution. Resolve git conflicts from the workspace's git settings, where the
+  "Keep mine" / "Keep theirs" controls have always used the correct route and are unchanged by
+  this release. (#768)
+
+### Notes for self-hosters
+
+- No migrations run in this release; the schema is unchanged from 0.17.0.
+- Windows executables are still unsigned — SmartScreen will warn. Verify the download against
+  `checksums.txt` on the release page.
+
 ## [0.17.0] — 2026-08-04
 
 ### Upgrade notes
