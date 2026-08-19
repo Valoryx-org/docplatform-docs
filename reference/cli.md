@@ -200,6 +200,8 @@ docplatform stop [flags]
 
 Requests a graceful shutdown and waits up to 30 seconds for it to complete. `--force` does not skip the graceful attempt or shorten the wait — it only decides whether to escalate to a forceful kill *after* the full grace period has already been given, and only against a process that has been positively verified as the instance holding this data directory's lock. Restart is `docplatform stop && docplatform serve`.
 
+**How the graceful request reaches the server:** `serve` opens a small internal shutdown-control endpoint bound **only to `127.0.0.1`, on an ephemeral port** — this is hardcoded and not operator-configurable, so the endpoint is unreachable from the network by construction, even if `serve` itself is bound to all interfaces. `stop` authenticates to it with a per-boot token read from the local data directory. If that endpoint is unavailable, `stop` falls back to sending the process a `SIGTERM` directly. Either way, only someone with local access to this machine and this data directory can request a shutdown.
+
 ### Exit codes
 
 | Code | Meaning |
