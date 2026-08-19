@@ -401,7 +401,7 @@ DocPlatform Doctor v<version>
 [OK]   git: binary found
 [OK]   workspace_dirs: 2 git-enabled, all directories present
 [OK]   sync_state: no stuck workspaces
-[OK]   fs_db_consistency: 42 pages on FS, 42 in DB
+[OK]   fs_db_consistency: 42 pages indexed, 42 in DB (consistent)
 [WARN] wikilinks: 2 broken wikilink(s) found
 [OK]   backups: 3 backup(s), most recent: 2026-08-18
 ================================
