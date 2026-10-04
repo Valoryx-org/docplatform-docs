@@ -7,7 +7,7 @@ description: Connect AI tools like Claude Code, Claude Desktop, Cursor, and VS C
 
 DocPlatform includes a built-in [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that lets AI assistants read, write, search, and manage your documentation directly. Instead of copy-pasting content into chat windows, your AI tools work with your docs natively.
 
-> **MCP runs against a DocPlatform instance you operate yourself.** The MCP server is built into the DocPlatform binary and reads that instance's local data directory directly — it is not a network client that logs in to a remote server. So MCP works with the self-hosted **Community Edition** (and any cloud-edition binary you run yourself). The managed **DocPlatform Cloud** at [app.valoryx.dev](https://app.valoryx.dev) does **not** currently expose an MCP endpoint, so AI tools cannot yet connect to a managed-cloud workspace over MCP. This guide assumes you are running your own instance.
+> **MCP works on both self-hosted and managed Cloud.** The MCP server is built into the DocPlatform binary and is also mounted at `/mcp` on the managed **DocPlatform Cloud** host, [app.valoryx.dev](https://app.valoryx.dev) — AI tools can connect over Streamable HTTP using an API key, the same way they would against a self-hosted instance's HTTP transport. Self-hosted deployments (the **Community Edition**, or any cloud-edition binary you run yourself) additionally expose the local **stdio** transport (`docplatform mcp`), which has no Cloud equivalent since it requires running the binary on your own machine.
 
 ## Prerequisites
 
