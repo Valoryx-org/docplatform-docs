@@ -12,6 +12,166 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.3] — 2026-10-06
+
+A security and correctness release. Every change is a fix or a dependency update, and **no new
+database migrations run** — upgrading is a binary swap. (Two already-shipped migration files were
+corrected in place; see *Notes for self-hosters*.) There was no public 0.17.2: that version label was
+used only for an interim cloud deployment and was never tagged or published, so for self-hosters this
+is the release after 0.17.1 and contains everything since.
+
+### Security
+
+- **Updated the Git library (`go-git` 5.19.1 → 5.19.2)**, fixing two upstream vulnerabilities in the
+  library DocPlatform uses to work with the Git repositories you connect to a workspace (#765):
+  [GHSA-hc8v-wwc9-vgxm](https://github.com/advisories/GHSA-hc8v-wwc9-vgxm) (**High**) — worktree
+  operations could follow symbolic links, letting a crafted repository cause reads or writes outside
+  the intended working directory — and
+  [GHSA-qgq7-7hm3-q39j](https://github.com/advisories/GHSA-qgq7-7hm3-q39j) (**Moderate**) —
+  maliciously named references served by a malicious or compromised Git *server* could modify files
+  outside the reference storage.
+  **How exposed you are depends on whether a `git` binary is installed on the host.** With `git` on
+  `PATH` (the Docker image installs it), clone, pull, push and remote listing run through the native
+  binary and `go-git` only handles local operations. Without it, `go-git` handles **everything,
+  including clone and pull** — the main path by which an untrusted remote reaches you — and
+  DocPlatform falls back to that mode silently, logging only a startup warning. The published binaries
+  do not bundle `git`. Check with `git --version` as the DocPlatform user; if it is missing, install
+  it or treat this update as urgent. Highest risk if you sync from a repository or a Git server you do
+  not fully control. No DocPlatform behaviour, API, schema or configuration changed for this item.
+- **The release binaries and the Docker image are built with Go 1.26.8.** This closes six Go
+  standard-library advisories present in the 0.17.1 release binaries, which were built with Go
+  1.26.1: GO-2026-6218 (`net/url`), GO-2026-6091 (`html/template`), GO-2026-6090 (`crypto/tls`),
+  GO-2026-6089 (`net/http`), GO-2026-6088 (`encoding/xml`) and GO-2026-5972 (`encoding/asn1`).
+  If you build from source, use Go 1.26.8 or later. (#803)
+- **A custom domain must prove DNS ownership before it is saved.** Attaching a custom domain to a
+  published site checked the CNAME but saved the domain regardless, so a workspace admin on a plan
+  with custom domains could claim a domain they did not own — blocking its real owner permanently
+  (domains are unique) and, because certificate issuance trusted the stored row, obtaining HTTPS
+  for it. The save now fails with `422 DOMAIN_NOT_VERIFIED`, naming the CNAME target to add, and
+  writes nothing until the record resolves. The ownership check also runs before the
+  "already claimed" lookup, so it can no longer be used to probe which domains are taken.
+  *Behaviour change:* re-saving a domain whose CNAME has since been removed now fails the same way
+  instead of silently succeeding. (#791)
+- **Removing someone from a workspace now disconnects their live connection.** A WebSocket opened
+  while the user was a member stayed open — still receiving page updates — after they were removed,
+  archived from the organization, or deleted. Membership is now re-checked on the connection's
+  keepalive tick (about once a minute) and the socket is closed when it fails. Archiving an org
+  member now also invalidates the permission cache for every workspace they held in that
+  organization, and deleting a user for all of theirs; neither did before — only the
+  remove-from-workspace path did. (#795)
+- **The per-user cap on live connections now holds when connections open at the same moment.** The
+  server counted a user's live connections to a workspace before registering a new one, but the
+  registration itself finished later, in the background. Several connections opened together could
+  therefore all pass the check and exceed the cap. The count and the registration are now one step.
+  (#800)
+- **A logged-out or revoked session can no longer keep downloading private uploads.** The route
+  that serves uploaded files (`GET /api/v1/content/:workspace/uploads/:filename`) sits outside the
+  authenticated route group so that images on published sites load without signing in. It checked
+  an access token's signature and expiry but not whether the token's session still existed, so a
+  captured or post-logout token could keep reading a private workspace's uploads until it
+  expired. A token whose session is gone is now refused with the same 404 an unauthenticated
+  request gets, and the check fails closed if the session lookup errors. The route is also
+  rate-limited now, in the same bucket as published-site pages. Public images on published sites
+  stay reachable without signing in. (#798)
+- **Database backups are no longer world-readable.** SQLite creates the backup file itself and does
+  not inherit the live database's permissions, so every backup landed as `0644` while, on our cloud
+  deployment, the live database was `0640`/`0600` — any local account, including a reverse proxy
+  running on the same host, could read a full copy of the data. New backups are chmod'd to `0600`
+  as soon as they are written, and the backup directories are created `0700`. Existing backup
+  files are **not** changed; see *Notes for self-hosters*. (#796)
+
+### Fixed
+
+- **Custom-domain HTTPS certificates could not be issued after the server had been up for a few
+  days.** The domain resolver cached hostnames using a buffer owned by the HTTP request, which the
+  server later reused, corrupting the cache's internal structure until every lookup for the
+  certificate-issuance hook (`/internal/caddy/ask`) failed with a recovered panic and a 500. On the
+  cloud service this had been recurring since July and was masked only by restarts. The resolver now
+  owns its keys. Recovered panics also log a stack trace once per distinct message per ten minutes
+  instead of only a one-line summary. (#780)
+- **Two migrations could delete every threaded comment reply.** Migrations 027 and 039 rebuild the
+  comments table and, while doing so, declared the reply-to-parent reference against the table being
+  dropped, so the drop cascaded through all replies while top-level comments survived. The migration
+  files are corrected in place and now carry regression tests. See *Notes for self-hosters* for who
+  is affected. (#789)
+- **Content that arrives by git sync, import or migration is now searchable, and content deleted
+  upstream stops being searchable.** The reconcile step every git-driven path uses wrote pages
+  directly to the database, bypassing the search indexer, so a git-connected workspace had no working
+  search for anything that came in through git, and pages deleted in the repository stayed in search
+  results (title, path and an excerpt) indefinitely. Reconcile now rebuilds the workspace's index
+  from its final state; each workspace's index is repaired by its next sync. This also removes an
+  older rebuild path that indexed raw files including their frontmatter. The 0.17.1 note that this
+  fix "has not shipped yet" is now closed. (#762)
+- **Saving or removing a custom domain no longer discards a theme or navigation change saved at
+  the same moment.** The domain writers updated the whole published-site row from a copy read earlier, so a
+  concurrent settings save could be overwritten with stale values. They now re-read the site inside
+  the write transaction, so a concurrent save is no longer overwritten. (#773)
+- **Community Edition: `GET /api/v1/me/context` returned `503 BILLING_DISABLED`.** The always-allow
+  licence service that Community is supposed to use was never wired unless Stripe billing was
+  configured, which it never is on a self-hosted install. It is now always present. (A cloud
+  deployment that has lost its Stripe configuration still gets the 503 there; that case is tracked
+  separately.) (#794)
+- **Cloud plan limits were enforceable around the edges, and are not any more:**
+  - two simultaneous "create workspace" requests on the Free plan could both succeed, leaving two
+    workspaces on a one-workspace plan; the count is now re-checked inside the write
+    transaction (#790);
+  - a bulk import (a markdown, GitBook or Notion zip) was never checked against the per-workspace page cap, so a
+    Free workspace could import thousands of pages at once; the import is now refused up front when
+    the net new pages — including pages reserved by imports still running — would exceed the cap
+    (Community Edition is unlimited and unaffected) (#793);
+  - a Stripe plan change wrote the subscription and the organization's plan in two separate steps and
+    treated a failure of the second as a log line, which could strand a paying organization on its
+    old plan, or keep a cancelled one on paid limits, with no retry. Both writes are now one
+    transaction and a failure makes Stripe retry the webhook (#792);
+  - the downgrade warning email told the owner about workspaces and editors over the new plan's
+    limits but not about workspaces over its per-workspace page cap (150 pages on Team, 500 on
+    Business). It now does (#799).
+- **A data race in WebSocket teardown** — the connection handler could return while its writer was
+  still running — surfaced as an intermittent race-detector failure in CI after the membership
+  re-check above was added. The handler now always waits for its writer, and shutting the hub down
+  closes every pump cleanly. It was only observed in CI, but the underlying race touches a pooled
+  connection buffer, so it was never safe to leave. (#801)
+- **Expired data is now actually purged.** The scheduled cleanup never ran: its job could not be
+  queued (a database constraint rejected it every time) and the failure was only logged as a
+  warning. That cleanup deletes expired sessions, expired password-reset tokens, invitations more
+  than 7 days past expiry, and pages that have been in the trash for more than 30 days. The same
+  was true of the cleanup that removes completed or failed imports older than 30 days and their
+  staging files. Both now run every six hours. See *Notes for self-hosters*. (#807)
+
+### Changed
+
+- **Dependencies:** `mcp-go` 0.56.0 → 1.1.1 (the MCP server library, a major version bump),
+  `fiber` 2.52.15, `goldmark` 1.8.6, `bleve` 2.6.1, `golang.org/x/net` 0.59.0, `golang.org/x/sys`
+  0.48.0, `golang.org/x/crypto` 0.57.0, `prometheus/client_golang` 1.24.1, `oklog/ulid` 2.1.2,
+  `pflag` 1.0.10, `go-isatty` 0.0.24, `testify` 1.12.1 (#782). GitHub Actions versions were bumped
+  repo-wide in the same cycle (#783).
+
+### Notes for self-hosters
+
+- **No new migrations run; the schema is unchanged from 0.17.1.** Migrations 027 and 039 were
+  edited in place (#789). The migration runner does not re-run or checksum applied migrations, so an
+  install that has already crossed them is not touched again. **Who is affected:** an install that
+  upgrades from a version that has *not* yet run 027 or 039 keeps all of its comment replies, where
+  before it would have lost them. An install that already ran them with threaded replies present has
+  already lost those replies; nothing in this release can restore them. (If you are about to upgrade
+  from 0.16.x or earlier and have comment threads you care about, take a backup first as usual — this
+  release makes the step safe, the backup is for everything else.)
+- **Backups:** new backups are `0600` and their directories `0700` (#796). Files written by earlier
+  versions keep their old mode — tighten them yourself once, for example
+  `chmod 700 <your backup directory> && chmod 600 <your backup directory>/*`.
+- **Custom domains:** a re-save of an existing domain now requires its CNAME to resolve (#791).
+- **Uploads are rate-limited** together with published-site pages, at 600 requests per minute in
+  that shared bucket (#798). Every image on a published page counts as a request, so a very
+  image-heavy page viewed from one address can now see `429` responses.
+- **Search:** existing git-connected workspaces regain search on their next sync (#762).
+- **First cleanup after upgrading (#807):** six hours after the server starts, the scheduled
+  cleanup runs for the first time and clears the backlog. Pages that have been in the trash for
+  more than 30 days are **permanently deleted**, with their trash files. Completed or failed
+  imports older than 30 days are removed, with their staging folders. Restore any old trashed page
+  you still need before upgrading, or take a backup first.
+- Windows executables are still unsigned — SmartScreen will warn. Verify the download against
+  `checksums.txt` on the release page.
+
 ## [0.17.1] — 2026-08-19
 
 A security and correctness release. Every change is a fix, and **no database migrations run** —
