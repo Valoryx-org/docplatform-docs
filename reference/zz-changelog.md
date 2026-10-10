@@ -12,6 +12,67 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.4] — 2026-10-10
+
+A security release, cut from 0.17.3 with only the fixes listed here; changes merged since 0.17.3 that
+are not listed ship in a later release. **No database migrations run** — upgrading is a binary swap.
+Read *Notes for self-hosters* before upgrading if any workspace syncs with Git using an access token.
+
+### Security
+
+- **Git access tokens are no longer stored in the workspace's Git configuration.** A workspace
+  connected to a Git provider with a personal access token kept that token in plain text as the
+  `origin` URL in the workspace's `.git/config`, where it outlived token rotation and provider
+  disconnect and was copied into any backup of the data directory. The token now travels only with
+  each network call and is never written to `.git/config`, reflogs, `FETCH_HEAD`, process arguments,
+  logs or error messages. On first start, 0.17.4 scrubs every existing workspace repository
+  (`.git/config`, reflogs, `FETCH_HEAD` and the legacy `remotes/` and `branches/` files) before any
+  sync starts, and disconnecting a provider scrubs the repository too. Redirects on the same host
+  (for example a renamed repository) keep working; a redirect to any other host never receives the
+  token. SSH remotes are unchanged. (#810)
+- **A page id can no longer point a trash operation at another workspace's files.** Page ids come
+  from page frontmatter, including pages pulled by Git sync or imported, and were used unchecked to
+  build the trash file path. A crafted id such as `../../workspaces/<id>/<page>` could make deleting,
+  restoring or the 30-day trash purge move or remove a page file belonging to another workspace.
+  Ids are now validated: an unsafe id is replaced with a new one when the page is read in (and the
+  new id is written back to the file), and trash paths are confined to the page's own workspace.
+  Restore also refuses a page deleted in another workspace. Normal ids, including non-ULID ids such
+  as `page-guide`, are unaffected, and existing trash needs no migration. (#829)
+- **Private uploads are no longer cacheable by a CDN.** Every successful upload response was sent as
+  `Cache-Control: public, max-age=31536000, immutable`, including images read with a user's token
+  from a private workspace. Behind a caching proxy such as Cloudflare, one authorized read could put
+  the file in the edge cache for later anonymous requests. Uploads served from a published site keep
+  the long public cache; every other upload is now `private, no-store`. (#813)
+- **The release binaries and the Docker image are built with Go 1.26.9**, a Go security release with
+  fixes to `crypto/tls`, `html/template`, `net/http`, `net/textproto`, `os` and the `go` command.
+  The Docker builder image is now pinned to the same version. If you build from source, use Go 1.26.9
+  or later. (#826)
+
+### Fixed
+
+- **Leaving a page no longer loses the last few seconds of edits.** The editor saves two seconds after
+  you stop typing; navigating away inside that window lost the edit. Navigation now waits for the
+  pending save. If it fails or conflicts, you stay on the page
+  with your edit, and repeating the navigation leaves. Title, tag and publish changes are covered
+  too. (#812)
+- **Browser requests to the API now time out after 15 seconds** instead of hanging indefinitely.
+  A request that never returned previously froze navigation app-wide, with no error and nothing on
+  screen to explain it. File uploads and workspace exports are unaffected. (#812)
+- **Cloud: plan-downgrade warnings are accurate.** The over-limit warning now names workspaces by
+  name instead of an internal id, respects an active plan override (no warning email when an
+  override sets the limits), and is also sent when a subscription is cancelled. (#817)
+
+### Notes for self-hosters
+
+- **Rolling back to 0.17.3 after upgrading breaks token-based Git sync** until you upgrade again:
+  0.17.4's first start removes the token from each workspace's `.git/config`, and 0.17.3 reads it
+  from there. No content is lost; local changes push once 0.17.4 runs again.
+- **The upgrade does not clean copies of a token made before it.** If a workspace synced with an
+  access token, earlier backups or copies of the data directory still contain that token in plain
+  text. Revoke it with your Git provider and reconnect the workspace with a new one.
+- Native `git` older than 2.31 is no longer used for network operations; DocPlatform uses its
+  built-in Git library for them instead.
+
 ## [0.17.3] — 2026-10-06
 
 A security and correctness release. Every change is a fix or a dependency update, and **no new
