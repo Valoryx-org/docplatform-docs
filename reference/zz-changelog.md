@@ -12,6 +12,90 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.5] — 2026-10-30
+
+A correctness release from the main line. It carries every change merged since 0.17.3 that the
+security-only 0.17.4 did not — chiefly a group of data-loss fixes in the page/file ledger and in
+the rich editor. **No database migrations run** — upgrading is a binary swap.
+
+### Security
+
+- **Rate limits are no longer shared between unrelated visitors behind the same CDN edge.** The
+  unauthenticated limits — sign-in (20/min), password reset (5 per 15 min), published docs and
+  uploads (600/min) and Git webhooks — were keyed on the address the CDN presented rather than on
+  the visitor's own, so on a Cloudflare-fronted deployment everyone leaving through one edge shared
+  a single bucket and one busy client could push all the others into 429s. The limits are now keyed
+  on the real client address. (#818)
+- **Cloud: a removed custom domain no longer serves the sign-in page.** When a custom domain was
+  removed, or had never been configured, the request fell through to the single-page app — and
+  because the certificate issued earlier stays valid, the domain kept terminating TLS and
+  rendering our sign-in screen under a former customer's brand. An unrecognized host now returns
+  404. (#820)
+
+### Fixed
+
+- **The rich editor no longer deletes HTML it cannot display.** Opening a page whose markdown
+  contained an element outside the editor's allow-list — `<details>`, `<kbd>`, `<sup>`, `<svg>`, an
+  embed, or an HTML comment — dropped that content, together with its text, on the very next save.
+  That included a save triggered only by editing the title, the tags or the publish toggle, none of
+  which have any reason to touch the body. The editor now leaves a body it cannot faithfully
+  represent untouched, and omits the body altogether from a save that did not change it. (#814)
+- **Moving a page, or restoring one from the trash, can no longer overwrite another page's file.**
+  A stored page path may or may not carry the `.md` suffix, and `b` and `b.md` name one file on
+  disk. The checks guarding a move and a trash restore looked the destination up under one exact
+  spelling, so a request that used the other spelling passed the guard and overwrote the file
+  already sitting there — destroying the other page's content and leaving two entries pointing at
+  one file. Both checks now look up every spelling that names the same file, and the write itself
+  refuses to replace a file it did not create. (#828)
+- **A page renamed through Git, or brought back by a pull, is no longer silently lost.** When a Git
+  sync renamed a page (`git mv`) or brought a previously deleted page back, the update reached the
+  database under the page's existing id and collided with that page's own earlier entry. The error
+  was written to the server log and otherwise discarded, so the page was never saved. Such updates
+  are now resolved by looking the page up by its id first. (#809)
+- **A page brought back by Git sync no longer restores older content.** When a deleted page
+  reappeared through a Git pull, its earlier copy stayed in the trash, and a later restore wrote
+  that stale copy back over the current one. The stale copy is now dropped when the page returns.
+  (#824)
+- **Restore is no longer offered for pages that can never be restored.** Pages removed by Git sync,
+  or by deleting a workspace, were listed as restorable although no trash copy had ever been
+  written — so Restore failed every time and the entry simply reappeared on the next load, for the
+  whole 30-day window. Such entries are now marked un-restorable and the button is not offered.
+  (#815)
+- **Restoring a page can no longer overwrite a file that arrived while it ran.** If a Git pull
+  placed a file at the same path during a restore, the restore overwrote it; if a page was created
+  there instead, the collision surfaced as a server error rather than a conflict. A restore now
+  refuses rather than overwrite, and a genuine collision is reported as a conflict. (#816)
+- **Deleted pages no longer leave files behind for good.** The 30-day purge reaped a trash file
+  only when it also found that page's entry, so rebuilding a workspace — which drops the entries —
+  orphaned every trash file belonging to it, and nothing ever removed them afterwards. Orphaned
+  trash files are now swept. (#819)
+
+### Internal
+
+- CI no longer cancels healthy builds under load; every job declares a timeout that a guard
+  enforces; the test suite runs on the same toolchain the release binaries are built with; and a
+  one-second default timeout that made API tests flaky is now explicit at every call site.
+  (#822, #830, #825, #821)
+- **Hardening of a defect that never reached a release.** The page-save rework above (#809) briefly
+  let a save leave two live database entries naming one file when the path was supplied under a
+  different spelling. It was found and fixed before any published build carried it; the writer and
+  its occupancy check now share one canonical file key. (#823)
+
+### Notes for self-hosters
+
+- **About six hours after the first start, every orphaned trash file is swept at once.** These are
+  files under your data directory's `trash/` that no page entry can restore or purge — left behind
+  by earlier workspace rebuilds or failed deletes. The cleanup runs every six hours, the first time
+  six hours after the server starts, and removes all of them on that run — so copy anything you
+  rely on out of `trash/` before upgrading. From then on, rebuilding a workspace makes its earlier
+  tombstones' trash unrecoverable within the same six-hour window, and manual recovery from
+  `trash/` stops being possible for them. Pages still inside their 30-day trash window are
+  unaffected and remain restorable from the app. (#819)
+- **If you set `BASE_DOMAIN`, host matching now ignores the port, a trailing dot and letter case**,
+  so reaching your installation at `<base>:8080`, by a LAN address, or under a differently-cased
+  name keeps working. The 404 for an unrecognized host applies to the hosted edition only — a
+  self-hosted installation still serves the app for whatever host it is reached by. (#820)
+
 ## [0.17.4] — 2026-10-10
 
 A security release, cut from 0.17.3 with only the fixes listed here; changes merged since 0.17.3 that
