@@ -93,8 +93,10 @@ Self-hosted instances running `docplatform serve` already expose `/mcp` on the m
 To run MCP as its own standalone process instead — on its own port, independent of the main app — start it directly:
 
 ```bash
-docplatform mcp-server --addr :8081
+docplatform mcp-server            # listens on 127.0.0.1:8081 (localhost only)
 ```
+
+To reach it from other machines, bind a network address (`--addr :8081`) **and** put a TLS proxy with authentication in front of it.
 
 Then connect at `http://your-server:8081/mcp` the same way.
 
@@ -292,7 +294,7 @@ X-RateLimit-Reset: 1712847600
 
 ### HTTP transport issues
 
-- On `docplatform serve`, `/mcp` listens on the main app port — check that port's firewall rules. On the standalone `docplatform mcp-server`, the default listen address is `:8081`
+- On `docplatform serve`, `/mcp` listens on the main app port — check that port's firewall rules. On the standalone `docplatform mcp-server`, the default listen address is `127.0.0.1:8081` (localhost only, since vNEXT); pass `--addr :8081` to listen on all interfaces
 - For CORS issues on the standalone server, pass `--cors-origins https://your-domain.com`
 - Verify the Bearer token is sent in the `Authorization` header
 
