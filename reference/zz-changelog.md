@@ -12,6 +12,97 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.6] — 2026-11-12
+
+A Wave-1 release (REMEDIATION-PLAN-2026-11): live data-loss, tenant-isolation and privacy fixes,
+plus the first two steps of the Autodocs plan-00 work. **No database migrations run** — upgrading
+is a binary swap.
+
+### Security
+
+- **A page file pulled from Git can no longer be a symbolic link.** A symlink committed to a
+  workspace's remote was checked out as a link, so a page could read, and a save could write, any
+  file the service can reach, including another workspace. Both Git engines now write a symlink entry
+  as a plain file holding the link text (what Git itself does on filesystems without symlinks), a
+  link already on disk is converted the same way on the next pull, the auto-merge revert can no
+  longer bring one back, and the page store opens page files without following links and refuses
+  anything that is not a regular file. See the self-hoster note below. (#852, ops#985, ops#1059)
+- **A members-only page can no longer be served from a shared cache to someone who is not a
+  member.** Published-site responses carried a `public` cache directive even for members-only sites
+  and for the member view of a public page (the edit bar), so a proxy or CDN could store one visitor's
+  copy and replay it to the next. Such responses are now `private, no-cache` and the page validator
+  distinguishes the member view, so a cached member page never answers a non-member's revalidation.
+  Public pages and feeds for anonymous visitors cache exactly as before. (#847, ops#929)
+- **The standalone MCP server listens on localhost only by default.** `docplatform mcp-server` bound
+  every interface (`:8081`); it now binds `127.0.0.1:8081` unless `--addr` says otherwise, at both the
+  command line and the transport fallback. See the self-hoster note below. (#846, ops#771)
+
+### Fixed
+
+- **An AI agent's save can no longer silently replace a person's page text (ops#751).** MCP tools
+  pass a page path as `guides/x`, while the web editor stores `guides/x.md`. Both name one file, but
+  the save's conflict check looked up the page by the exact spelling, missed it, and skipped the
+  check, so an agent's `update_page` overwrote the human's text. Now every save is checked against
+  the bytes actually on disk, under one lock per file whatever the spelling: a save whose hash does
+  not match is refused with a conflict and writes nothing. A create never replaces an existing
+  file, an update of a page that no longer exists is a 404 and writes nothing, and a save whose
+  page id belongs to another workspace, or to a live page stored in another file, is refused before
+  anything is written. A file whose id disagrees with the page that lives at its path is saved as
+  that page. An empty `lastKnownHash` is refused for every caller (REST already did; MCP now does
+  too), so only the editor's explicit "Keep my changes" force save skips the check. The
+  `content_hash` that reads and writes return is now always the hash of the file's bytes, and a
+  write's response body and hash always describe the same bytes. (Plan 00 PR-1.)
+  - Limit: MCP `write_page` takes no hash from the caller; it reads the page and saves at once, so
+    it still replaces the body of an existing page the agent never looked at. Use `update_page`
+    with the hash from `read_page` to be protected.
+- **`docplatform init` works again.** It failed on every fresh data directory because the bootstrap
+  tried to add a member row for an actor named `system`, which is not a user; the workspace is now
+  created without a member. Ownership of an `init`-created workspace is assigned later (ops#242).
+  (#848, ops#739)
+- **The rich editor no longer silently rewrites task-list checkboxes, table column alignment or
+  link titles.** A page containing any of them, in any spelling the renderer accepts, opens in raw
+  mode, where a save keeps the markdown byte for byte; pages whose constructs survive a round-trip
+  keep opening in the rich editor. Expect the raw-mode notice on more pages than before. This is a
+  guard, not the full fix: the editor itself does not yet hold these constructs. (#849, ops#956)
+- **`docplatform mcp` and `docplatform mcp-server` no longer hang next to a running server.** They
+  opened the same data directory as `serve` without taking the single-writer lock and then waited
+  forever on the search index. They now take that lock and, when a server holds it, refuse within
+  five seconds with an "already running" message, which names the running instance's `/mcp`
+  endpoint when that instance answers. (#858, ops#756)
+
+### Changed
+
+- **MCP tool errors carry stable codes** (`CONFLICT:`, `NOT_FOUND:`, `VALIDATION_ERROR:`,
+  `INVALID_FRONTMATTER:`, `FORBIDDEN:`, `PLAN_LIMIT_REACHED:`, `TERMS_ACCEPTANCE_REQUIRED:`) and
+  no longer leak internal text such as database call chains or another workspace's page ids;
+  anything unexpected reads `<tool> failed: internal error`. MCP server version 0.5.3.
+- Privacy policy updated to v1.3 to disclose the analytics consent records the published-site
+  cookie banner keeps (ops#694 A6): what a record contains, that one is written on decline as
+  well as on accept, that it is normally not linked to an account, that the IP address is kept in it only
+  as a one-way hash (salted on the Cloud Service since 2026-11-06 12:49 UTC) which is treated as
+  personal data, and how to have a record anonymized on request. The policy also now lists the
+  server request log, which holds the IP address of every request. Internal drafting notes that
+  were being served at the end of the public policy are removed. (#845)
+
+### Internal
+
+- CI runs the cloud edition's own unit suites (`test-cloud`, informational for its first week) (#853,
+  ops#800); the Playwright smoke and release jobs are pinned to `ubuntu-24.04` after `ubuntu-latest`
+  moved to 26.04 (#854, ops#1048); the new-box backup recipe sets `umask 077` and the right owner on
+  `backup.sh` (#850, ops#832); routine GitHub Actions version bumps (#844).
+
+### Notes for self-hosters
+
+- **`docplatform mcp-server` is reachable from localhost only after this upgrade.** If you reached it
+  from another host, or published its port out of a container, pass `--addr 0.0.0.0:8081` (or a
+  specific interface) and put a TLS proxy with authentication in front of it; the old all-interfaces
+  default is gone. The in-app `/mcp` endpoint is unaffected.
+- **A repository that contains symbolic links sees them as small text files after the next pull.**
+  Each such file holds the link's target path, and links already checked out in a workspace are
+  converted on the first pull after the upgrade. The server's auto-commit may commit that conversion
+  back to your remote, whichever Git engine pulled. To see what will change before you upgrade:
+  `find <data-dir>/workspaces -type l -not -path '*/.git/*'`.
+
 ## [0.17.5] — 2026-10-30
 
 A correctness release from the main line. It carries every change merged since 0.17.3 that the
@@ -256,7 +347,7 @@ is the release after 0.17.1 and contains everything since.
   configured, which it never is on a self-hosted install. It is now always present. (A cloud
   deployment that has lost its Stripe configuration still gets the 503 there; that case is tracked
   separately.) (#794)
-- **Cloud plan limits were enforceable around the edges, and are not any more:**
+- **Cloud plan limits had gaps at the edges, and no longer do:**
   - two simultaneous "create workspace" requests on the Free plan could both succeed, leaving two
     workspaces on a one-workspace plan; the count is now re-checked inside the write
     transaction (#790);
