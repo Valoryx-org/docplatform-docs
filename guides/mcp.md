@@ -294,7 +294,7 @@ X-RateLimit-Reset: 1712847600
 
 ### HTTP transport issues
 
-- On `docplatform serve`, `/mcp` listens on the main app port — check that port's firewall rules. On the standalone `docplatform mcp-server`, the default listen address is `127.0.0.1:8081` (localhost only, since vNEXT); pass `--addr :8081` to listen on all interfaces
+- On `docplatform serve`, `/mcp` listens on the main app port — check that port's firewall rules. On the standalone `docplatform mcp-server`, the default listen address is `127.0.0.1:8081` (localhost only, since v0.17.6); pass `--addr :8081` to listen on all interfaces
 - For CORS issues on the standalone server, pass `--cors-origins https://your-domain.com`
 - Verify the Bearer token is sent in the `Authorization` header
 
