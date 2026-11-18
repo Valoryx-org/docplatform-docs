@@ -118,13 +118,12 @@ upgrading is a binary swap.
 
 ### Known issues
 
-- **`docplatform serve` cannot yet be reached from another machine without a reverse proxy.** It
-  listens on `127.0.0.1` only, and no setting changes that yet. So the Docker image's published port
+- **`docplatform serve` could not be reached from another machine without a reverse proxy.** It
+  listened on `127.0.0.1` only, and no setting changed that, so the Docker image's published port
   (`docker run -p 3000:3000`, docker-compose), a Fly.io deploy from the repo's `fly.toml`, and a
-  downloaded binary you expect to open at `http://<server-ip>:3000` all fail to connect. A reverse
-  proxy on the same machine works, which is how app.valoryx.dev runs, so it is not affected. The fix
-  (`--host` / `DOCPLATFORM_BIND_HOST`, with the image set to `0.0.0.0`) is in review and ships in the
-  next release. (ops#1101)
+  downloaded binary you expect to open at `http://<server-ip>:3000` all failed to connect. A reverse
+  proxy on the same machine worked, which is how app.valoryx.dev runs, so it was not affected.
+  **Fixed in 0.17.8** with `--host` / `DOCPLATFORM_BIND_HOST` (see the 0.17.8 entry above). (ops#1101)
 
 ## [0.17.6] — 2026-11-12
 
