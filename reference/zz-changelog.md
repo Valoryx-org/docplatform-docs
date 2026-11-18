@@ -12,6 +12,210 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.8] — 2026-11-18
+
+Two fixes held back from v0.17.7: self-hosted servers can be reached through the Docker image's
+published port again, and a brief database error no longer takes a custom domain offline. **No
+database migrations run** — upgrading is a binary swap.
+
+### Fixed
+
+- **The Docker image can be reached through its published port again.** Since March `docplatform serve`
+  listened on `127.0.0.1` only, with no way to change it, so `docker run -p 3000:3000`, docker-compose and
+  Fly never reached the server. `serve` now takes `--host` and `DOCPLATFORM_BIND_HOST`: `127.0.0.1` (the
+  default, this machine only) or `0.0.0.0` (every interface). The official image sets `0.0.0.0`; any other
+  value refuses to start. If you run the image with `--network host`, it now listens on every interface of
+  the host. Pass `-e DOCPLATFORM_BIND_HOST=127.0.0.1` to keep it local. The cloud edition stays on
+  loopback. (ops#1101)
+- **A brief database error no longer takes a custom domain offline for five minutes.** A failed
+  lookup was cached as "this domain does not exist", so a live custom domain answered 404 until the
+  cache expired. Now only a real "not found" is cached. While the database is failing, the cloud
+  edition answers 503 with `Retry-After` instead of 404. Custom-domain lookups pause for two seconds
+  after a failure so a burst of requests cannot pile onto a struggling database, and the domain
+  answers again within seconds of the database recovering. (ops#1010)
+
+## [0.17.7] — 2026-11-18
+
+Security and reliability fixes from the 2026-11 remediation wave. **No database migrations run** —
+upgrading is a binary swap.
+
+### Security
+
+- **A folder in a workspace that is a symbolic link can no longer redirect page reads or writes.**
+  The v0.17.6 protection against symlinked page files only looked at the file itself, not at the
+  folders above it, so a page saved under a linked folder (say `docs` pointing elsewhere on the
+  server) could be written outside the workspace, and a page read through it could show a file from
+  outside. Every page read, save, move, delete and restore, the wikilink repair and the
+  `.docplatform` publish/navigation files now refuse any path whose folders inside the workspace
+  include a link. Git-synced workspaces already turn committed links into plain files on every
+  clone and pull, so this is a second line of defence. (ops#1080)
+- **A sync conflict for a file with no page yet can now be read or resolved only by members of
+  its own workspace.** Opening or resolving such a conflict used to check only that the caller was
+  signed in, so a user of another organisation who knew its address could read both versions or
+  delete it. Each conflict now records the workspace it belongs to, and access needs the same role
+  in that workspace as for any other conflict (viewer to read, workspace admin to resolve); a
+  conflict whose workspace cannot be determined is refused. Conflicts created before this upgrade
+  are re-created on the workspace's next sync. (ops#986)
+- **A git remote URL that cannot be parsed is now refused instead of used as-is.** A URL with a
+  stray control character, a bad percent-escape or a malformed host was passed on unchanged by both
+  Git engines, so an access token inside it would have reached the git command line, `.git/config`
+  and log lines. No current way of connecting a repository produces such a URL; this closes the gap
+  before one does. Sync now stops with "re-enter the repository URL". (ops#996)
+- **A published site's `manifest.json` now follows the server-wide "require sign-in for published
+  sites" setting.** With `PUBLISH_REQUIRE_AUTH` on, the page and every feed already sent anonymous
+  visitors to sign in and were never publicly cacheable, but the manifest of a public site was still
+  served to anyone with `Cache-Control: public`. It now uses the same sign-in check and cache policy
+  as the page. Without the setting nothing changes. (ops#1063)
+- **`docplatform preview` listens on this machine only by default.** It used to bind every network
+  interface, so anyone on the same network could read the previewed docs. It now binds `127.0.0.1`;
+  pass `--host 0.0.0.0` to open it up on purpose (inside a container, for example). An empty `--host`
+  also means loopback. `serve` and `mcp-server` already default to loopback. (ops#1062)
+
+### Fixed
+
+- **An API key with the `write` scope can now edit pages.** A `read` + `write` key was refused when
+  it tried to save a page (MCP `update_page`, `write_page`, `move_page`, and the matching REST
+  calls); only an `admin` key could change content. The `write` scope now covers creating, editing,
+  moving and commenting on pages, uploading files and resolving Git sync conflicts, as the
+  documentation already said for MCP. **Deleting a page still needs
+  the `delete` scope** (or `admin`): a key with only `read` and `write` cannot delete a page. A key
+  with the `delete` scope can now actually delete a page (before, that also needed `admin`). Your
+  workspace role is still checked on top of the key's scopes, exactly as before. Keys created in the
+  app with "Read & Write" carry `read`, `write` and `delete`, so they can now edit and delete pages
+  for anyone whose role allows it. (ops#1086)
+- **MCP refusals now start with a stable code.** A tool call that is not allowed answers
+  `FORBIDDEN: …`, and a tool call sent without a valid API key answers `UNAUTHORIZED: …`, so an
+  agent can tell them apart without reading the sentence (the same convention as `NOT_FOUND:` and
+  `CONFLICT:` from 0.17.6). Listing the tools still works without a key. (ops#1086)
+- **A page an AI agent created can now be deleted and moved from the web app and the REST API.**
+  A page written through MCP `write_page` as `guides/x` could not be deleted (or moved) through the
+  web app or REST, which address it as `guides/x.md`: the request answered "not found" and the page
+  stayed. Delete and move now find a page by its file, whichever way its path is spelled, the same
+  way saves already did; the same holds the other way round for MCP `delete_page` and `move_page` on
+  a page made in the web app. A save through the other spelling also no longer resets the page's
+  position in the sidebar. (ops#1085)
+- **Page saves are crash-safe.** A page file used to be overwritten in place, so a crash or power
+  loss in the middle of a save could leave a half-written page. Saves now write a temporary file and
+  swap it in, so a page on disk is always either the old or the new version. Temporary files left by
+  a crash are removed at start-up and are never committed to Git. One side effect: in a Git-synced
+  workspace, a file of your own whose name ends in `.repair.tmp` matches the same pattern, so it is
+  removed from the server's working copy at start-up too. Two saves to the same page at the same
+  moment can no longer both proceed. (ops#754)
+
+### Changed
+
+- **The API-key form now says what each access option allows.** A line under the access choice
+  describes the selected option (Read Only, Read & Write, Admin), including that Read & Write can
+  delete pages (restorable for 30 days), that a key works only in its workspace and never exceeds
+  its creator's role, and that an Admin key cannot manage API keys. Keys and their scopes are
+  unchanged. (ops#1086)
+- **Docker image moved to Alpine 3.24.** The runtime image was on Alpine 3.20, which is end-of-life
+  and kept a fixed musl vulnerability (CVE-2026-107891). It now uses Alpine 3.24, supported until
+  2028. (ops#1069)
+- **Dependencies updated:** `golang.org/x/crypto` 0.58.0, `golang.org/x/net` 0.62.0,
+  `golang.org/x/sys` 0.50.0, Fiber 2.52.16, Bleve 2.6.3, mcp-go 1.5.0, goldmark 1.8.7, Prometheus
+  client 1.25.0, pflag 1.1.0.
+
+### Known issues
+
+- **`docplatform serve` could not be reached from another machine without a reverse proxy.** It
+  listened on `127.0.0.1` only, and no setting changed that, so the Docker image's published port
+  (`docker run -p 3000:3000`, docker-compose), a Fly.io deploy from the repo's `fly.toml`, and a
+  downloaded binary you expect to open at `http://<server-ip>:3000` all failed to connect. A reverse
+  proxy on the same machine worked, which is how app.valoryx.dev runs, so it was not affected.
+  **Fixed in 0.17.8** with `--host` / `DOCPLATFORM_BIND_HOST` (see the 0.17.8 entry above). (ops#1101)
+
+## [0.17.6] — 2026-11-12
+
+A Wave-1 release (REMEDIATION-PLAN-2026-11): live data-loss, tenant-isolation and privacy fixes,
+plus the first two steps of the Autodocs plan-00 work. **No database migrations run** — upgrading
+is a binary swap.
+
+### Security
+
+- **A page file pulled from Git can no longer be a symbolic link.** A symlink committed to a
+  workspace's remote was checked out as a link, so a page could read, and a save could write, any
+  file the service can reach, including another workspace. Both Git engines now write a symlink entry
+  as a plain file holding the link text (what Git itself does on filesystems without symlinks), a
+  link already on disk is converted the same way on the next pull, the auto-merge revert can no
+  longer bring one back, and the page store opens page files without following links and refuses
+  anything that is not a regular file. See the self-hoster note below. (#852, ops#985, ops#1059)
+- **A members-only page can no longer be served from a shared cache to someone who is not a
+  member.** Published-site responses carried a `public` cache directive even for members-only sites
+  and for the member view of a public page (the edit bar), so a proxy or CDN could store one visitor's
+  copy and replay it to the next. Such responses are now `private, no-cache` and the page validator
+  distinguishes the member view, so a cached member page never answers a non-member's revalidation.
+  Public pages and feeds for anonymous visitors cache exactly as before. (#847, ops#929)
+- **The standalone MCP server listens on localhost only by default.** `docplatform mcp-server` bound
+  every interface (`:8081`); it now binds `127.0.0.1:8081` unless `--addr` says otherwise, at both the
+  command line and the transport fallback. See the self-hoster note below. (#846, ops#771)
+
+### Fixed
+
+- **An AI agent's save can no longer silently replace a person's page text (ops#751).** MCP tools
+  pass a page path as `guides/x`, while the web editor stores `guides/x.md`. Both name one file, but
+  the save's conflict check looked up the page by the exact spelling, missed it, and skipped the
+  check, so an agent's `update_page` overwrote the human's text. Now every save is checked against
+  the bytes actually on disk, under one lock per file whatever the spelling: a save whose hash does
+  not match is refused with a conflict and writes nothing. A create never replaces an existing
+  file, an update of a page that no longer exists is a 404 and writes nothing, and a save whose
+  page id belongs to another workspace, or to a live page stored in another file, is refused before
+  anything is written. A file whose id disagrees with the page that lives at its path is saved as
+  that page. An empty `lastKnownHash` is refused for every caller (REST already did; MCP now does
+  too), so only the editor's explicit "Keep my changes" force save skips the check. The
+  `content_hash` that reads and writes return is now always the hash of the file's bytes, and a
+  write's response body and hash always describe the same bytes. (Plan 00 PR-1.)
+  - Limit: MCP `write_page` takes no hash from the caller; it reads the page and saves at once, so
+    it still replaces the body of an existing page the agent never looked at. Use `update_page`
+    with the hash from `read_page` to be protected.
+- **`docplatform init` works again.** It failed on every fresh data directory because the bootstrap
+  tried to add a member row for an actor named `system`, which is not a user; the workspace is now
+  created without a member. Ownership of an `init`-created workspace is assigned later (ops#242).
+  (#848, ops#739)
+- **The rich editor no longer silently rewrites task-list checkboxes, table column alignment or
+  link titles.** A page containing any of them, in any spelling the renderer accepts, opens in raw
+  mode, where a save keeps the markdown byte for byte; pages whose constructs survive a round-trip
+  keep opening in the rich editor. Expect the raw-mode notice on more pages than before. This is a
+  guard, not the full fix: the editor itself does not yet hold these constructs. (#849, ops#956)
+- **`docplatform mcp` and `docplatform mcp-server` no longer hang next to a running server.** They
+  opened the same data directory as `serve` without taking the single-writer lock and then waited
+  forever on the search index. They now take that lock and, when a server holds it, refuse within
+  five seconds with an "already running" message, which names the running instance's `/mcp`
+  endpoint when that instance answers. (#858, ops#756)
+
+### Changed
+
+- **MCP tool errors carry stable codes** (`CONFLICT:`, `NOT_FOUND:`, `VALIDATION_ERROR:`,
+  `INVALID_FRONTMATTER:`, `FORBIDDEN:`, `PLAN_LIMIT_REACHED:`, `TERMS_ACCEPTANCE_REQUIRED:`) and
+  no longer leak internal text such as database call chains or another workspace's page ids;
+  anything unexpected reads `<tool> failed: internal error`. MCP server version 0.5.3.
+- Privacy policy updated to v1.3 to disclose the analytics consent records the published-site
+  cookie banner keeps (ops#694 A6): what a record contains, that one is written on decline as
+  well as on accept, that it is normally not linked to an account, that the IP address is kept in it only
+  as a one-way hash (salted on the Cloud Service since 2026-11-06 12:49 UTC) which is treated as
+  personal data, and how to have a record anonymized on request. The policy also now lists the
+  server request log, which holds the IP address of every request. Internal drafting notes that
+  were being served at the end of the public policy are removed. (#845)
+
+### Internal
+
+- CI runs the cloud edition's own unit suites (`test-cloud`, informational for its first week) (#853,
+  ops#800); the Playwright smoke and release jobs are pinned to `ubuntu-24.04` after `ubuntu-latest`
+  moved to 26.04 (#854, ops#1048); the new-box backup recipe sets `umask 077` and the right owner on
+  `backup.sh` (#850, ops#832); routine GitHub Actions version bumps (#844).
+
+### Notes for self-hosters
+
+- **`docplatform mcp-server` is reachable from localhost only after this upgrade.** If you reached it
+  from another host, or published its port out of a container, pass `--addr 0.0.0.0:8081` (or a
+  specific interface) and put a TLS proxy with authentication in front of it; the old all-interfaces
+  default is gone. The in-app `/mcp` endpoint is unaffected.
+- **A repository that contains symbolic links sees them as small text files after the next pull.**
+  Each such file holds the link's target path, and links already checked out in a workspace are
+  converted on the first pull after the upgrade. The server's auto-commit may commit that conversion
+  back to your remote, whichever Git engine pulled. To see what will change before you upgrade:
+  `find <data-dir>/workspaces -type l -not -path '*/.git/*'`.
+
 ## [0.17.5] — 2026-10-30
 
 A correctness release from the main line. It carries every change merged since 0.17.3 that the
@@ -256,7 +460,7 @@ is the release after 0.17.1 and contains everything since.
   configured, which it never is on a self-hosted install. It is now always present. (A cloud
   deployment that has lost its Stripe configuration still gets the 503 there; that case is tracked
   separately.) (#794)
-- **Cloud plan limits were enforceable around the edges, and are not any more:**
+- **Cloud plan limits had gaps at the edges, and no longer do:**
   - two simultaneous "create workspace" requests on the Free plan could both succeed, leaving two
     workspaces on a one-workspace plan; the count is now re-checked inside the write
     transaction (#790);
