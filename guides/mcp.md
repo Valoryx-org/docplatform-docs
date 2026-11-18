@@ -108,7 +108,7 @@ docplatform mcp-server            # listens on 127.0.0.1:8081 (localhost only)
 
 To reach it from other machines, bind a network address (`--addr :8081`) **and** put a TLS proxy with authentication in front of it.
 
-Then connect at `http://your-server:8081/mcp` the same way.
+Then connect at `http://localhost:8081/mcp` on the same host, or through your TLS proxy's `https://` URL from another machine.
 
 ---
 
