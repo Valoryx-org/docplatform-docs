@@ -12,6 +12,28 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.8] — 2026-11-18
+
+Two fixes held back from v0.17.7: self-hosted servers can be reached through the Docker image's
+published port again, and a brief database error no longer takes a custom domain offline. **No
+database migrations run** — upgrading is a binary swap.
+
+### Fixed
+
+- **The Docker image can be reached through its published port again.** Since March `docplatform serve`
+  listened on `127.0.0.1` only, with no way to change it, so `docker run -p 3000:3000`, docker-compose and
+  Fly never reached the server. `serve` now takes `--host` and `DOCPLATFORM_BIND_HOST`: `127.0.0.1` (the
+  default, this machine only) or `0.0.0.0` (every interface). The official image sets `0.0.0.0`; any other
+  value refuses to start. If you run the image with `--network host`, it now listens on every interface of
+  the host. Pass `-e DOCPLATFORM_BIND_HOST=127.0.0.1` to keep it local. The cloud edition stays on
+  loopback. (ops#1101)
+- **A brief database error no longer takes a custom domain offline for five minutes.** A failed
+  lookup was cached as "this domain does not exist", so a live custom domain answered 404 until the
+  cache expired. Now only a real "not found" is cached. While the database is failing, the cloud
+  edition answers 503 with `Retry-After` instead of 404. Custom-domain lookups pause for two seconds
+  after a failure so a burst of requests cannot pile onto a struggling database, and the domain
+  answers again within seconds of the database recovering. (ops#1010)
+
 ## [0.17.7] — 2026-11-18
 
 Security and reliability fixes from the 2026-11 remediation wave. **No database migrations run** —
