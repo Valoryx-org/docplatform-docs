@@ -12,6 +12,98 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.7] — 2026-11-18
+
+Security and reliability fixes from the 2026-11 remediation wave. **No database migrations run** —
+upgrading is a binary swap.
+
+### Security
+
+- **A folder in a workspace that is a symbolic link can no longer redirect page reads or writes.**
+  The v0.17.6 protection against symlinked page files only looked at the file itself, not at the
+  folders above it, so a page saved under a linked folder (say `docs` pointing elsewhere on the
+  server) could be written outside the workspace, and a page read through it could show a file from
+  outside. Every page read, save, move, delete and restore, the wikilink repair and the
+  `.docplatform` publish/navigation files now refuse any path whose folders inside the workspace
+  include a link. Git-synced workspaces already turn committed links into plain files on every
+  clone and pull, so this is a second line of defence. (ops#1080)
+- **A sync conflict for a file with no page yet can now be read or resolved only by members of
+  its own workspace.** Opening or resolving such a conflict used to check only that the caller was
+  signed in, so a user of another organisation who knew its address could read both versions or
+  delete it. Each conflict now records the workspace it belongs to, and access needs the same role
+  in that workspace as for any other conflict (viewer to read, workspace admin to resolve); a
+  conflict whose workspace cannot be determined is refused. Conflicts created before this upgrade
+  are re-created on the workspace's next sync. (ops#986)
+- **A git remote URL that cannot be parsed is now refused instead of used as-is.** A URL with a
+  stray control character, a bad percent-escape or a malformed host was passed on unchanged by both
+  Git engines, so an access token inside it would have reached the git command line, `.git/config`
+  and log lines. No current way of connecting a repository produces such a URL; this closes the gap
+  before one does. Sync now stops with "re-enter the repository URL". (ops#996)
+- **A published site's `manifest.json` now follows the server-wide "require sign-in for published
+  sites" setting.** With `PUBLISH_REQUIRE_AUTH` on, the page and every feed already sent anonymous
+  visitors to sign in and were never publicly cacheable, but the manifest of a public site was still
+  served to anyone with `Cache-Control: public`. It now uses the same sign-in check and cache policy
+  as the page. Without the setting nothing changes. (ops#1063)
+- **`docplatform preview` listens on this machine only by default.** It used to bind every network
+  interface, so anyone on the same network could read the previewed docs. It now binds `127.0.0.1`;
+  pass `--host 0.0.0.0` to open it up on purpose (inside a container, for example). An empty `--host`
+  also means loopback. `serve` and `mcp-server` already default to loopback. (ops#1062)
+
+### Fixed
+
+- **An API key with the `write` scope can now edit pages.** A `read` + `write` key was refused when
+  it tried to save a page (MCP `update_page`, `write_page`, `move_page`, and the matching REST
+  calls); only an `admin` key could change content. The `write` scope now covers creating, editing,
+  moving and commenting on pages, uploading files and resolving Git sync conflicts, as the
+  documentation already said for MCP. **Deleting a page still needs
+  the `delete` scope** (or `admin`): a key with only `read` and `write` cannot delete a page. A key
+  with the `delete` scope can now actually delete a page (before, that also needed `admin`). Your
+  workspace role is still checked on top of the key's scopes, exactly as before. Keys created in the
+  app with "Read & Write" carry `read`, `write` and `delete`, so they can now edit and delete pages
+  for anyone whose role allows it. (ops#1086)
+- **MCP refusals now start with a stable code.** A tool call that is not allowed answers
+  `FORBIDDEN: …`, and a tool call sent without a valid API key answers `UNAUTHORIZED: …`, so an
+  agent can tell them apart without reading the sentence (the same convention as `NOT_FOUND:` and
+  `CONFLICT:` from 0.17.6). Listing the tools still works without a key. (ops#1086)
+- **A page an AI agent created can now be deleted and moved from the web app and the REST API.**
+  A page written through MCP `write_page` as `guides/x` could not be deleted (or moved) through the
+  web app or REST, which address it as `guides/x.md`: the request answered "not found" and the page
+  stayed. Delete and move now find a page by its file, whichever way its path is spelled, the same
+  way saves already did; the same holds the other way round for MCP `delete_page` and `move_page` on
+  a page made in the web app. A save through the other spelling also no longer resets the page's
+  position in the sidebar. (ops#1085)
+- **Page saves are crash-safe.** A page file used to be overwritten in place, so a crash or power
+  loss in the middle of a save could leave a half-written page. Saves now write a temporary file and
+  swap it in, so a page on disk is always either the old or the new version. Temporary files left by
+  a crash are removed at start-up and are never committed to Git. One side effect: in a Git-synced
+  workspace, a file of your own whose name ends in `.repair.tmp` matches the same pattern, so it is
+  removed from the server's working copy at start-up too. Two saves to the same page at the same
+  moment can no longer both proceed. (ops#754)
+
+### Changed
+
+- **The API-key form now says what each access option allows.** A line under the access choice
+  describes the selected option (Read Only, Read & Write, Admin), including that Read & Write can
+  delete pages (restorable for 30 days), that a key works only in its workspace and never exceeds
+  its creator's role, and that an Admin key cannot manage API keys. Keys and their scopes are
+  unchanged. (ops#1086)
+- **Docker image moved to Alpine 3.24.** The runtime image was on Alpine 3.20, which is end-of-life
+  and kept a fixed musl vulnerability (CVE-2026-107891). It now uses Alpine 3.24, supported until
+  2028. (ops#1069)
+- **Dependencies updated:** `golang.org/x/crypto` 0.58.0, `golang.org/x/net` 0.62.0,
+  `golang.org/x/sys` 0.50.0, Fiber 2.52.16, Bleve 2.6.3, mcp-go 1.5.0, goldmark 1.8.7, Prometheus
+  client 1.25.0, pflag 1.1.0.
+
+### Known issues
+
+- **`docplatform serve` cannot yet be reached from another machine without a reverse proxy.** It
+  listens on `127.0.0.1` only, and no setting changes that yet. So the Docker image's published port
+  (`docker run -p 3000:3000`, docker-compose), a Fly.io deploy from the repo's `fly.toml`, and a
+  downloaded binary you expect to open at `http://<server-ip>:3000` all fail to connect. A reverse
+  proxy on the same machine works, which is how app.valoryx.dev runs, so it is not affected. The fix
+  (`--host` / `DOCPLATFORM_BIND_HOST`, with the image set to `0.0.0.0`) is in review and ships in the
+  next release. (ops#1101)
+
 ## [0.17.6] — 2026-11-12
 
 A Wave-1 release (REMEDIATION-PLAN-2026-11): live data-loss, tenant-isolation and privacy fixes,
