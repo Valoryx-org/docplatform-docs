@@ -145,7 +145,7 @@ docker run -d --name docplatform --network host \
   ghcr.io/valoryx-org/docplatform:latest
 ```
 
-Only `127.0.0.1` and `0.0.0.0` are accepted. With `DOCPLATFORM_BIND_HOST=127.0.0.1` and `-p`, the published port does not connect, because loopback inside the container is not reachable from outside it.
+Only `127.0.0.1` and `0.0.0.0` are accepted as explicit non-default values (an empty value or `localhost` also resolves to `127.0.0.1`). With `DOCPLATFORM_BIND_HOST=127.0.0.1` and `-p`, the published port does not connect, because loopback inside the container is not reachable from outside it.
 
 ## SSH key for git sync
 

@@ -103,7 +103,7 @@ INFO  Database initialized       path=<your-data-dir>/data.db wal=true
 INFO  Migrations applied         count=1
 INFO  Search index ready         documents=42
 INFO  Workspace loaded           name="Docs" slug=docs git_remote=git@github.com:...
-INFO  Listening on               http://0.0.0.0:3000
+INFO  Listening on               http://127.0.0.1:3000
 ```
 
 `<your-data-dir>` is an OS-standard per-user location by default, not `.docplatform/` — see [Getting Started](../getting-started/index.md#architecture-at-a-glance) or run `docplatform doctor` to see the resolved path.
