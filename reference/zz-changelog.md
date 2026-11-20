@@ -12,6 +12,36 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.9] — 2026-11-19
+
+Two legal-text fixes, one clearer error and one security fix. **No database migrations run** — upgrading is a binary swap.
+
+### Changed
+
+- **The Terms of Service page no longer shows internal review notes.** A drafting block headed
+  "LAWYER REVIEW NOTES — remove before publishing" was served at the end of `/terms`. It is removed.
+  The terms themselves are unchanged and stay at version 1.1, so nobody is asked to accept them
+  again. (ops#1078)
+- **The cookie banner on published sites now says that your choice is recorded.** It reads "This
+  site uses cookies for anonymous usage analytics and keeps a record of your choice." Clicking
+  Accept or Decline stores a consent record, as the privacy policy (v1.3) describes. (ops#1078)
+
+### Fixed
+
+- **An organization whose plan is missing gets a clear error instead of a misleading one.** If an
+  organization's plan had no matching row in the `plans` table, creating a workspace answered 404
+  "resource not found" and creating a page answered a bare 500. Both now answer 500 with the code
+  `PLAN_NOT_CONFIGURED`, the server log names the organization and the plan, and `docplatform doctor`
+  warns about every organization in that state (it reports, it does not change anything). Internal
+  server errors from the API's standard error helper are now also written to the server log with
+  their request id. (ops#1084)
+- **`docplatform init --git-url` no longer saves a credential that a malformed URL hides.** A remote
+  URL carrying a password or token in a shape the URL parser cannot split cleanly — for example a
+  token containing an unescaped `/` — could be written to the workspace's git settings in plain
+  text and passed to git as is. `init` now refuses such a URL, and similar shapes that could hide a
+  credential, before it writes anything. Ordinary remotes, including scp-style SSH
+  (`git@host:org/repo.git`) and local paths, are accepted as before. (ops#1095)
+
 ## [0.17.8] — 2026-11-18
 
 Two fixes held back from v0.17.7: self-hosted servers can be reached through the Docker image's
@@ -118,12 +148,13 @@ upgrading is a binary swap.
 
 ### Known issues
 
-- **`docplatform serve` could not be reached from another machine without a reverse proxy.** It
-  listened on `127.0.0.1` only, and no setting changed that, so the Docker image's published port
+- **`docplatform serve` cannot yet be reached from another machine without a reverse proxy.** It
+  listens on `127.0.0.1` only, and no setting changes that yet. So the Docker image's published port
   (`docker run -p 3000:3000`, docker-compose), a Fly.io deploy from the repo's `fly.toml`, and a
-  downloaded binary you expect to open at `http://<server-ip>:3000` all failed to connect. A reverse
-  proxy on the same machine worked, which is how app.valoryx.dev runs, so it was not affected.
-  **Fixed in 0.17.8** with `--host` / `DOCPLATFORM_BIND_HOST` (see the 0.17.8 entry above). (ops#1101)
+  downloaded binary you expect to open at `http://<server-ip>:3000` all fail to connect. A reverse
+  proxy on the same machine works, which is how app.valoryx.dev runs, so it is not affected. The fix
+  (`--host` / `DOCPLATFORM_BIND_HOST`, with the image set to `0.0.0.0`) is in review and ships in the
+  next release. (ops#1101)
 
 ## [0.17.6] — 2026-11-12
 
